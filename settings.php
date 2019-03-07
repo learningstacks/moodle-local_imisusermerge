@@ -1,43 +1,43 @@
 <?php
-// Copyright (C) 2017 Learning Stacks LLC https://learningstacks.com/
+
+// This file is part of the Certificate module for Moodle - http://moodle.org/
 //
-// This file is a part of the IMIS Integration Components developed by
-// Learning Stacks LLC - https://learningstacks.com/
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-// This file cannot be copied or distributed without the express permission
-// of Learning Stacks LLC.
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Provides some custom settings for the certificate module
  *
- *
- * @package   local_imisbridge
- * @copyright 2017 onwards Learning Stacks LLC {@link https://learningstacks.com/}
- * @license   All Rights Reserved
+ * @package    mod_certificate
+ * @copyright  Michael Avelar <michaela@moodlerooms.com>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+defined('MOODLE_INTERNAL') || die;
+global $ADMIN;
 
-// Ensure the configurations for this site are set
-if ($hassiteconfig) {
+/* @throws \dml_exception; */
 
-    // Create the new settings page
-    // - in a local plugin this is not defined as standard, so normal $settings->methods will throw an error as
-    // $settings will be NULL
-//    $settings = new admin_settingpage('local_imisusermerge', 'IMIS User Merge Settings');
-//
-//    // Create
-//    $ADMIN->add('localplugins', $settings);
 
-    // Add a setting field to the settings for this page
-//    $settings->add(new admin_setting_configtext(
-//        'local_imisbridge/base_api_url',
-//        'Base API Url',
-//        'The base URL where the bridge web services are located',
-//        '',
-//        PARAM_URL));
-//    $settings->add(new admin_setting_configcheckbox(
-//        'local_imisbridge/enable_debug_trace',
-//        'Enable debug tracing',
-//        'If checked, trace messages will be displayed on screen',
-//        '0',
-//        PARAM_BOOL));
+if ($ADMIN->fulltree) {
+
+    $settings->add(new mod_certificate_admin_setting_upload('certificate/uploadimage',
+        get_string('uploadimage', 'mod_certificate'), get_string('uploadimagedesc', 'certificate'), ''));
+
+    $settings->add(new mod_certificate_admin_setting_font('certificate/fontsans',
+        get_string('fontsans', 'mod_certificate'), get_string('fontsans_desc', 'mod_certificate'), 'freesans'));
+
+    $settings->add(new mod_certificate_admin_setting_font('certificate/fontserif',
+        get_string('fontserif', 'mod_certificate'), get_string('fontserif_desc', 'mod_certificate'), 'freeserif'));
+
 }

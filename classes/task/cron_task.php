@@ -30,6 +30,7 @@ class cron_task extends \core\task\scheduled_task {
      * Get a descriptive name for this task (shown to admins).
      *
      * @return string
+     * @throws \coding_exception
      */
     public function get_name() {
         return get_string('crontask', 'local_imisusermerge');
@@ -39,16 +40,10 @@ class cron_task extends \core\task\scheduled_task {
      * Run cron.
      */
     public function execute() {
-        // If a process_merge_file task does not exist
-        $t = new send_certs_task();
-        $t->set_blocking(false);
-        $t->set_custom_data([
-            'certcode' => $params['certcode'],
-            'email' => $params['email']
-        ]);
-        task_manager::queue_adhoc_task($t);
+        // If no task: create one
+        // If task failed: allow 3 retries then email
+        // else: noop
 
-        return true;
     }
 
 }
