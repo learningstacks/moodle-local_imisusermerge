@@ -108,54 +108,37 @@ class merge_file {
      */
     public function __construct($filepath, MergeUserTool $merge_tool = null) {
 
-        try {
+        $this->config = imisusermerge::get_config();
+        $this->status = self::STATUS_TODO;
+        $this->filepath = $filepath;
 
-            $this->filepath = $filepath;
-            if ($merge_tool) {
-                $this->merge_tool = $merge_tool;
-            } else {
-                $this->merge_tool = new MergeUserTool();
-            }
-
-            if (!file_exists($this->filepath)) {
-                $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception('no_file');
-            }
-
-            $this->config = get_config(imisusermerge::COMPONENT_NAME);
-            // TODO: Move this to a config section
-            $this->config->fieldmap = [
-                'duplicateid' => 'from_imisid',
-                'mergetoid' => 'to_imisid',
-                'dateofmerge' => 'merge_time',
-                'full_name' => 'full_name',
-                'email' => 'email'
-            ];
-
-            $this->status = self::STATUS_TODO;
-
-        } catch (merge_exception $ex) {
-            return $this->status;
-
-        } catch (\dml_exception $ex) {
-            $this->status = self::STATUS_ERROR;
-            throw new merge_exception('get_config failed');
+        if ($merge_tool) {
+            $this->merge_tool = $merge_tool;
+        } else {
+            $this->merge_tool = new MergeUserTool();
         }
 
-        return $this->status;
+        if (!file_exists($this->filepath)) {
+            $this->status = self::STATUS_INVALID_FILE;
+            throw new merge_exception('no_file');
+        }
+
+
     }
 
     /**
-     * @return string|null
-     * @throws \dml_exception
+     * @return merge_file|null
+     * @throws merge_exception
      */
-    static public function get_next_file() {
+    public static function get_next_file() {
         $firstfile = null;
 
-        $config = get_config(imisusermerge::COMPONENT_NAME);
+        /* @var config */
+        $config = imisusermerge::get_config();
+        $regex = $config->get_file_name_regex();
 
-        foreach (scandir($config->indir) as $item) {
-            if (preg_match($config->fnregexp, $item)) {
+        foreach (scandir($config->get_in_dir()) as $item) {
+            if (preg_match($regex, $item)) {
                 if ($firstfile === null || strcmp(strtolower($item), strtolower($firstfile)) < 0) {
                     $firstfile = $item;
                 }
@@ -173,7 +156,7 @@ class merge_file {
      * @throws merge_exception
      */
     protected function parse_header($line) {
-        $map = $this->config->fieldmap;
+        $map = $this->config->get_file_field_map();
         $this->fldpos_map = [];
         $this->headers = str_getcsv(strtolower(trim($line)));
         $this->missing_fields = array_diff(array_keys($map), $this->headers);
@@ -312,8 +295,8 @@ class merge_file {
                             break;
                         case merge_action::STATUS_ERROR:
                             $this->status = self::STATUS_ERROR;
-                            throw $ex;
                             $this->failed++;
+                            throw $ex;
                             break;
                         case merge_action::STATUS_INVALID:
                             $this->status = self::STATUS_INVALID_FILE;
@@ -402,39 +385,17 @@ class merge_file {
 
     protected function get_completed_file_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->getCompletedDir()}/{$filename}.csv";
+        return "{$this->config->get_completed_dir()}/{$filename}.csv";
     }
 
     protected function get_completed_log_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->getCompletedDir()}/{$filename}_log.csv";
+        return "{$this->config->get_completed_dir()}/{$filename}_log.csv";
     }
 
     protected function get_failed_log_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->getInDir()}/{$filename}_log.csv";
-    }
-
-
-    /**
-     * @return mixed|null
-     */
-    public function getConfig() {
-        return $this->config;
-    }
-
-    /**
-     * @return string
-     */
-    public function getInDir() {
-        return $this->config->indir;
-    }
-
-    /**
-     * @return string
-     */
-    public function getCompletedDir() {
-        return $this->config->completed_dir;
+        return "{$this->config->get_in_dir()}/{$filename}_log.csv";
     }
 
     /**
@@ -459,13 +420,6 @@ class merge_file {
     }
 
     /**
-     * @return mixed
-     */
-    public function getFldposMap() {
-        return $this->fldpos_map;
-    }
-
-    /**
      * @return array
      */
     public function getMerges() {
@@ -485,17 +439,5 @@ class merge_file {
     public function getMessage() {
         return $this->message;
     }
-
-    public function getStatusString($status_val) {
-
-
-        if (array_key_exists($status_val)) {
-            return $map[$status_val];
-        } else {
-            return 'STATUS_UNKNOWN';
-        }
-
-    }
-
 
 }

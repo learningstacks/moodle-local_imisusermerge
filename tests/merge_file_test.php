@@ -57,11 +57,11 @@ class merge_file_testcase extends base {
         $this->resetAfterTest(true);
 
         for ($num = 3; $num >= 1; $num--) {
-            touch("{$this->indir}/user_merge_request_20190101-00000{$num}.csv");
+            touch("{$this->in_dir}/user_merge_request_20190101-00000{$num}.csv");
         }
         for ($num = 1; $num <= 3; $num++) {
             $this->assertEquals("user_merge_request_20190101-00000{$num}.csv", merge_file::get_next_file());
-            unlink("{$this->indir}/user_merge_request_20190101-00000{$num}.csv");
+            unlink("{$this->in_dir}/user_merge_request_20190101-00000{$num}.csv");
         }
     }
 

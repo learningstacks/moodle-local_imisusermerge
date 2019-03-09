@@ -4,6 +4,7 @@ namespace local_imisusermerge\task;
 
 use local_imisusermerge\merge_file;
 use local_imisusermerge\merge_exception;
+use core\task\manager as task_manager;
 
 /**
  * Class merge_task
@@ -11,11 +12,12 @@ use local_imisusermerge\merge_exception;
  */
 class merge_task extends \core\task\adhoc_task {
 
+    private $path = null;
 
     /**
      * @var merge_file|null
      */
-    private $file = null;
+    private $merge_file = null;
 
     /**
      * @return bool
@@ -25,14 +27,15 @@ class merge_task extends \core\task\adhoc_task {
      */
     public function execute() {
         try {
-            if ($path = merge_file::get_next_file()) {
-                $this->file = new merge_file($path);
-                $this->file->process();
+            if ($this->path = merge_file::get_next_file()) {
+                $this->merge_file = new merge_file($this->path);
+                $this->merge_file->process();
+                $next_task = new merge_task();
+                task_manager::queue_adhoc_task($next_task);
             }
-            return true; // Task completed
 
         } catch (merge_exception $ex) {
-            if (!$this->file) {
+            if (!$this->merge_file) {
                 // We found a file, but failed to create merge_file
                 // Throw an exception
                 // This will fail the task and queue it for retry
@@ -40,7 +43,7 @@ class merge_task extends \core\task\adhoc_task {
 
             } else {
                 // File eas created, now we check status
-                switch ($this->file->getStatus()) {
+                switch ($this->merge_file->getStatus()) {
                     case merge_file::STATUS_FAILED:
                     case merge_file::STATUS_ERROR:
                     case merge_file::STATUS_INVALID_FILE:
@@ -52,13 +55,16 @@ class merge_task extends \core\task\adhoc_task {
             }
         }
 
-        return true; // Causes task to be completed and removed
     }
 
     /**
      *
      */
     protected function notify() {
+
+    }
+
+    protected function get_merge_tool() {
 
     }
 }

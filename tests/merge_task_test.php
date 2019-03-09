@@ -19,55 +19,98 @@ class merge_task_testcase extends base {
         parent::tearDown();
     }
 
+    protected function run_task() {
+        $task = null;
+        $exception = null;
+
+        if ($task = \core\task\manager::get_next_adhoc_task(time())) {
+            $this->assertInstanceOf('\\local_imisusermerge\\task\\merge_task', $task);
+
+            try {
+                $task->execute();
+                \core\task\manager::adhoc_task_complete($task);
+
+            } catch (\Exception $ex) {
+                $exception = $ex;
+                \core\task\manager::adhoc_task_failed($task);
+            }
+        }
+
+        return $exception;
+
+    }
+
+    public function test_task_with_file_dataset() {
+        return [
+            [
+                'No File' => [
+                    0,
+                    [
+                    ],
+                    false
+                ],
+
+                'No Data' => [
+                    0,
+                    [
+                        'duplicateid,mergetoid,dateofmerge,full_name,email'
+                    ],
+                    false
+                ],
+
+                'Non Matching Lines' => [
+                    0,
+                    [
+                        'duplicateid,mergetoid,dateofmerge,full_name,email',
+                        'a,a1,1/1/2019,name,email@email.com',
+                        'a,a1,1/1/2019,name', // missing email
+                    ],
+                    true
+                ]
+
+            ]
+
+        ];
+    }
+
     /**
-     * @throws \moodle_exception
+     * @dataprovider test_task_with_file_dataset
      */
-    protected function do_task() {
-        // Create and queue a merge_task.
-        $task = new merge_task();
-        \core\task\manager::queue_adhoc_task($task);
+    public function test_task_with_file($data, $expect_exception) {
+        $this->resetAfterTest(true);
 
-        // Get it from the scheduler and execute it
-        $now = time();
-        $task = \core\task\manager::get_next_adhoc_task($now);
-        $this->assertInstanceOf('\\local_imisusermerge\\task\\merge_task', $task);
+        $path = null;
+        if (!empty($data)) {
+            $path = $this->write_request_file('20190101-000001', $data);
+        }
 
-        try {
-            $task->execute(); // No exceptions expected
-            \core\task\manager::adhoc_task_complete($task);
-        } catch (\Exception $ex) {
-            \core\task\manager::adhoc_task_failed($task);
+        \core\task\manager::queue_adhoc_task(new merge_task());
+
+        $exception = $this->run_task();
+
+        if ($expect_exception) {
+            $this->assertNotNull($exception, "Exception expected");
+            $this->assertSuccessFiles($path);
+        } else {
+            $this->assertNull($exception, "Exception not expected");
+            $this->asserFailedFiles($path);
         }
     }
 
     /**
      * @throws \moodle_exception
      */
-    public function test_empty_file() {
+    public function test_all_files_processed() {
         $this->resetAfterTest(true);
 
         $timestamp = "20190101-000000";
         $path = $this->write_request_file("20190101-000000", [
             'duplicateid,mergetoid,dateofmerge,full_name,email'
-        ]);
+        ]); // Headers, no data
 
-        $this->assertFileExists($path);
-        $this->do_task();
+        $this->run_task();
         $this->assertFileNotExists($path, "File has been deleted");
-        $this->assertNull(\core\task\manager::get_next_adhoc_task(time()+3600), "Task is gone");
-    }
-
-    /**
-     * @throws \dml_exception
-     * @throws \moodle_exception
-     */
-    public function test_no_file() {
-        $this->resetAfterTest(true);
-
-        $this->resetAfterTest(true);
-        $this->assertNull(merge_file::get_next_file());
-        $this->do_task();
-        $this->assertNull(\core\task\manager::get_next_adhoc_task(time()+3600), "Task is gone");
+        $this->assertNull(\core\task\manager::get_next_adhoc_task(time() + 3600), "Task is gone");
     }
 
 }

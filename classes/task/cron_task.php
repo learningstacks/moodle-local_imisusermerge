@@ -22,7 +22,11 @@
  * @copyright  2014 Dan Poltawski <dan@moodle.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
 namespace local_imisusermerge\task;
+
+use local_imisusermerge\imisusermerge;
+use core\task\manager as task_manager;
 
 class cron_task extends \core\task\scheduled_task {
 
@@ -40,10 +44,37 @@ class cron_task extends \core\task\scheduled_task {
      * Run cron.
      */
     public function execute() {
-        // If no task: create one
-        // If task failed: allow 3 retries then email
-        // else: noop
+        $current_task = $this->get_current_task();
+        $fail_delay_threshold = 100;
 
+        // If no task: create one
+        if (!$current_task) {
+            $next_task = new merge_task();
+            task_manager::queue_adhoc_task($next_task);
+        }
+
+    }
+
+    /**
+     * If a merge_task currently exists, fetch it
+     * @return merge_task|null
+     * @throws \dml_exception
+     */
+    protected function get_current_task() {
+        global $DB;
+
+        $current_task = null;
+
+        $record = $DB->get_record('task_adhoc', [
+            'component' => imisusermerge::COMPONENT_NAME,
+            'classname' => merge_task::class
+        ]);
+
+        if ($record) {
+            $current_task = self::adhoc_task_from_record($record);
+        }
+
+        return $current_task;
     }
 
 }
