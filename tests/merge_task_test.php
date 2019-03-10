@@ -5,8 +5,8 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . "/base.php");
 
+use local_imisusermerge\imisusermerge;
 use local_imisusermerge\task\merge_task;
-use local_imisusermerge\merge_file;
 use core\task\manager as task_manager;
 
 class merge_task_testcase extends base {
@@ -19,64 +19,39 @@ class merge_task_testcase extends base {
         parent::tearDown();
     }
 
-    protected function run_task() {
-        $task = null;
-        $exception = null;
-
-        if ($task = \core\task\manager::get_next_adhoc_task(time())) {
-            $this->assertInstanceOf('\\local_imisusermerge\\task\\merge_task', $task);
-
-            try {
-                $task->execute();
-                \core\task\manager::adhoc_task_complete($task);
-
-            } catch (\Exception $ex) {
-                $exception = $ex;
-                \core\task\manager::adhoc_task_failed($task);
-            }
-        }
-
-        return $exception;
-
-    }
-
-    public function test_task_with_file_dataset() {
+    public function task_with_file_dataset() {
         return [
-            [
-                'No File' => [
-                    0,
-                    [
-                    ],
-                    false
+            'No File' => [
+                [
                 ],
+                true
+            ],
 
-                'No Data' => [
-                    0,
-                    [
-                        'duplicateid,mergetoid,dateofmerge,full_name,email'
-                    ],
-                    false
+            'No Data' => [
+                [
+                    'duplicateid,mergetoid,dateofmerge,full_name,email'
                 ],
+                true
+            ],
 
-                'Non Matching Lines' => [
-                    0,
-                    [
-                        'duplicateid,mergetoid,dateofmerge,full_name,email',
-                        'a,a1,1/1/2019,name,email@email.com',
-                        'a,a1,1/1/2019,name', // missing email
-                    ],
-                    true
-                ]
-
+            'Non Matching Lines' => [
+                [
+                    'duplicateid,mergetoid,dateofmerge,full_name,email',
+                    'a,a1,1/1/2019,name,email@email.com',
+                    'a,a1,1/1/2019,name', // missing email
+                ],
+                false
             ]
-
         ];
     }
 
     /**
-     * @dataprovider test_task_with_file_dataset
+     * @dataProvider task_with_file_dataset
+     * @param $data
+     * @param $expect_success
+     * @throws \moodle_exception
      */
-    public function test_task_with_file($data, $expect_exception) {
+    public function test_task_with_file($data, $expect_success) {
         $this->resetAfterTest(true);
 
         $path = null;
@@ -84,33 +59,66 @@ class merge_task_testcase extends base {
             $path = $this->write_request_file('20190101-000001', $data);
         }
 
-        \core\task\manager::queue_adhoc_task(new merge_task());
+        task_manager::queue_adhoc_task(new merge_task());
 
-        $exception = $this->run_task();
-
-        if ($expect_exception) {
-            $this->assertNotNull($exception, "Exception expected");
-            $this->assertSuccessFiles($path);
+        $results = $this->do_adhoc_tasks();
+        if ($expect_success) {
+            $this->assertTrue($results[0][1], "Fail: Task did not succeed");
+            if ($path) {
+                $this->assertSuccessFiles($path);
+            }
         } else {
-            $this->assertNull($exception, "Exception not expected");
-            $this->asserFailedFiles($path);
+            $this->assertFalse($results[0][1], "Fail: Task did not fail");
+            if ($path) {
+                $this->assertFailedFiles($path);
+            }
         }
     }
 
     /**
+     * Verify that when a task completes successfully, it creates another task
+     * In so doing, all files will be processed
      * @throws \moodle_exception
      */
-    public function test_all_files_processed() {
+    public function test_all_files_processed_in_correct_order() {
         $this->resetAfterTest(true);
 
-        $timestamp = "20190101-000000";
-        $path = $this->write_request_file("20190101-000000", [
-            'duplicateid,mergetoid,dateofmerge,full_name,email'
-        ]); // Headers, no data
+        $users = $this->create_users(range(1, 4));
 
-        $this->run_task();
-        $this->assertFileNotExists($path, "File has been deleted");
-        $this->assertNull(\core\task\manager::get_next_adhoc_task(time() + 3600), "Task is gone");
+        $path1 = $this->write_request_file("20190101-000002", [
+            'duplicateid,mergetoid,dateofmerge,full_name,email',
+            'user1,user2,1/1/2019,name,email@email.com'
+        ]);
+
+        $path2 = $this->write_request_file("20190101-000001", [
+            'duplicateid,mergetoid,dateofmerge,full_name,email',
+            'user3,user4,1/1/2019,name,email@email.com'
+        ]);
+
+        $merge_tool_mock = $this->getMergeToolMock();
+        $merge_tool_mock
+            ->expects($this->exactly(2))
+            ->method('merge')
+            ->withConsecutive(
+                [$users[4]->id, $users[3]->id],
+                [$users[2]->id, $users[1]->id]
+            )
+            ->willReturnOnConsecutiveCalls(
+                [true, [], 0],
+                [true, [], 0]
+            );
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
+
+        task_manager::queue_adhoc_task(new merge_task());
+        $results = $this->do_adhoc_tasks();
+
+        $this->assertEquals(3, count($results), "Fail: there should be 3 results");
+        $this->assertEquals($path2, ($results[0][0]->get_path()));
+        $this->assertEquals($path1, ($results[1][0]->get_path()));
+        $this->assertNull(($results[2][0]->get_path()), "Fail: last task should have no path");
+        $this->assertSuccessFiles($path1);
+        $this->assertSuccessFiles($path2);
+        $this->assertNull(task_manager::get_next_adhoc_task(time() + 3600), "Tasks not completed");
     }
 
 }

@@ -17,11 +17,6 @@
 namespace local_imisusermerge;
 defined('MOODLE_INTERNAL') || die();
 
-require_once(__DIR__ . "/../../../admin/tool/mergeusers/lib/mergeusertool.php");
-
-use \MergeUserTool;
-
-
 /**
  * Class service_proxy
  * Interface to IMIS Bridge services
@@ -38,27 +33,27 @@ class merge_file {
     const STATUS_ERROR = 'STATUS_ERROR';
 
     /**
-     * @var mixed|null
+     * @var config
      */
     private $config;
     /**
-     * @var
+     * @var string
      */
     private $filepath;
     /**
-     * @var array
+     * @var string[]
      */
     private $lines = [];
     /**
-     * @var
+     * @var string[]
      */
     private $headers;
     /**
-     * @var
+     * @var string[]
      */
     private $missing_fields;
     /**
-     * @var
+     * @var array
      */
     private $fldpos_map;
     /**
@@ -66,17 +61,13 @@ class merge_file {
      */
     private $merges = [];
     /**
-     * @var int
+     * @var string
      */
     private $status;
     /**
-     * @var
+     * @var string
      */
     private $message;
-    /**
-     * @var MergeUserTool
-     */
-    private $merge_tool;
 
     /**
      * @var
@@ -103,20 +94,13 @@ class merge_file {
     /**
      * imisusermerge constructor.
      * @param $filepath
-     * @param MergeUserTool|null $merge_tool
      * @throws merge_exception
      */
-    public function __construct($filepath, MergeUserTool $merge_tool = null) {
+    public function __construct($filepath) {
 
         $this->config = imisusermerge::get_config();
         $this->status = self::STATUS_TODO;
         $this->filepath = $filepath;
-
-        if ($merge_tool) {
-            $this->merge_tool = $merge_tool;
-        } else {
-            $this->merge_tool = new MergeUserTool();
-        }
 
         if (!file_exists($this->filepath)) {
             $this->status = self::STATUS_INVALID_FILE;
@@ -135,12 +119,12 @@ class merge_file {
 
         /* @var config */
         $config = imisusermerge::get_config();
-        $regex = $config->get_file_name_regex();
+        $regex = $config->file_name_regex;
 
-        foreach (scandir($config->get_in_dir()) as $item) {
-            if (preg_match($regex, $item)) {
-                if ($firstfile === null || strcmp(strtolower($item), strtolower($firstfile)) < 0) {
-                    $firstfile = $item;
+        foreach (scandir($config->in_dir) as $filename) {
+            if (preg_match($regex, $filename)) {
+                if ($firstfile === null || strcmp(strtolower($filename), strtolower($firstfile)) < 0) {
+                    $firstfile = $filename;
                 }
             }
         }
@@ -156,14 +140,14 @@ class merge_file {
      * @throws merge_exception
      */
     protected function parse_header($line) {
-        $map = $this->config->get_file_field_map();
+        $map = $this->config->file_field_map;
         $this->fldpos_map = [];
         $this->headers = str_getcsv(strtolower(trim($line)));
         $this->missing_fields = array_diff(array_keys($map), $this->headers);
 
         if (!empty($this->missing_fields)) {
             $this->status = self::STATUS_INVALID_FILE;
-            throw new merge_exception('file_missing_fields', $this->asArray());
+            throw new merge_exception('file_missing_fields', $this->as_string_params());
         }
 
         foreach ($map as $inname => $outname) {
@@ -182,19 +166,19 @@ class merge_file {
 
             if (!file_exists($this->filepath)) {
                 $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception("missing_file", $this->asArray());
+                throw new merge_exception("no_file", $this->as_string_params());
             }
 
             // Load entire file into array so we ensure we process each line
             $this->lines = file($this->filepath, FILE_IGNORE_NEW_LINES);
             if ($this->lines === false) {
                 $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception("read_failed", $this->asArray());
+                throw new merge_exception("read_failed", $this->as_string_params());
             }
 
             if (count($this->lines) < 2) {
                 $this->status = self::STATUS_EMPTY_FILE;
-                throw new merge_exception("empty_file", $this->asArray());
+                throw new merge_exception("empty_file", $this->as_string_params());
             }
 
             $from = [];
@@ -208,11 +192,13 @@ class merge_file {
                 $this->current_line_num = $linenum;
                 if (!empty($str)) {
 
-                    $this->merges[] = $merge = new merge_action($linenum, $str, $this->fldpos_map);
-                    if ($merge->getStatus() == merge_action::STATUS_INVALID) {
+                    try {
+                        $this->merges[] = $merge = new merge_action($linenum, $str, $this->fldpos_map);
+                    } catch (merge_exception $ex) {
                         $this->status = self::STATUS_INVALID_FILE;
-                        throw new merge_exception('data_header_mismatch', $this->asArray());
+                        throw $ex;
                     }
+
 
                     $from_imisid = $merge->getFromImisid();
 
@@ -230,7 +216,7 @@ class merge_file {
             // Check for ambiguous merges
             if (!empty($dups)) {
                 $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception('ambiguous_merges', $this->asArray());
+                throw new merge_exception('ambiguous_merges', $this->as_string_params());
             }
 
             // Sert by mergetime to ensure we process in the same order as originally merged
@@ -246,7 +232,7 @@ class merge_file {
 
             if (!$success) {
                 $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception('sort_failed', $this->asArray());
+                throw new merge_exception('sort_failed', $this->as_string_params());
             }
 
             $this->status = self::STATUS_LOADED;
@@ -258,7 +244,7 @@ class merge_file {
         } catch (\Exception $ex) {
             $this->status = self::STATUS_ERROR;
             $this->message = $ex->getMessage();
-            throw new merge_exception('error_encountered', $this->asArray());
+            throw new merge_exception('error_encountered', $this->as_string_params());
         }
 
         return $this->status;
@@ -284,7 +270,7 @@ class merge_file {
             /* @var $merge merge_action */
             foreach ($this->merges as $merge) {
                 try {
-                    $merge->merge($this->merge_tool); // Succeeds or throws
+                    $merge->merge(); // Succeeds or throws
 
                 } catch (merge_exception $ex) {
                     switch ($merge->getStatus()) {
@@ -330,7 +316,7 @@ class merge_file {
             $this->status = self::STATUS_ERROR;
             $this->message = $ex->getMessage();
             $this->log_failure();
-            throw new merge_exception('error_encountered', $this->asArray());
+            throw new merge_exception('error_encountered', $this->as_string_params());
         }
     }
 
@@ -374,28 +360,28 @@ class merge_file {
     }
 
     /**
-     * @return array
+     * @return Object
      */
-    public function asArray() {
+    public function as_string_params() {
         $vars = get_object_vars($this);
-        return array_filter($vars, function ($val) {
+        return (object) (array_filter($vars, function ($val) {
             return !is_array($val) && !is_object($val);
-        });
+        }));
     }
 
-    protected function get_completed_file_path() {
+    public function get_completed_file_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->config->get_completed_dir()}/{$filename}.csv";
+        return "{$this->config->completed_dir}/{$filename}.csv";
     }
 
-    protected function get_completed_log_path() {
+    public function get_completed_log_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->config->get_completed_dir()}/{$filename}_log.csv";
+        return "{$this->config->completed_dir}/{$filename}_log.csv";
     }
 
-    protected function get_failed_log_path() {
+    public function get_failed_log_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->config->get_in_dir()}/{$filename}_log.csv";
+        return "{$this->config->in_dir}/{$filename}_log.csv";
     }
 
     /**

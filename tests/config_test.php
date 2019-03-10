@@ -104,10 +104,12 @@ class config_testcase extends base {
             }
         }
     }
+
     /**
      * @dataProvider config_dataset
      * @param $data
      * @param $expect_exception
+     * @throws \Exception
      */
     public function test_get_config_values($data, $expect_exception) {
         $this->resetAfterTest(true);
@@ -119,10 +121,10 @@ class config_testcase extends base {
                 $this->fail("Exception expected");
             }
 
-            $this->assertEquals($data['merge_in_dir'], $config->get_in_dir());
-            $this->assertEquals($data['merge_completed_dir'], $config->get_completed_dir());
-            $this->assertEquals($data['merge_file_name_regex'], $config->get_file_name_regex());
-            $map = $config->get_file_field_map();
+            $this->assertEquals($data['merge_in_dir'], $config->in_dir);
+            $this->assertEquals($data['merge_completed_dir'], $config->completed_dir);
+            $this->assertEquals($data['merge_file_name_regex'], $config->file_name_regex);
+            $map = $config->file_field_map;
             foreach($data['merge_file_field_map'] as $name => $val) {
                 $this->assertEquals($val, $map[$name], "$name");
             }
@@ -133,7 +135,5 @@ class config_testcase extends base {
             }
         }
     }
-
-
 
 }

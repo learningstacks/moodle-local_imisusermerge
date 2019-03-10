@@ -9,66 +9,104 @@
 namespace local_imisusermerge;
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * Class config
+ * @package local_imisusermerge
+ * @property-read string $in_dir the full path to the in_dir
+ * @property-read string $completed_dir
+ * @property-read string $file_name_regex
+ * @property-read array $file_field_map
+ * @property-read string[] $notification_email_addresses
+ */
 class config {
 
+    /**
+     * @var
+     */
     private $in_dir;
+    /**
+     * @var
+     */
     private $completed_dir;
+    /**
+     * @var
+     */
     private $file_field_map;
+    /**
+     * @var
+     */
     private $file_name_regex;
+    /**
+     * @var
+     */
+    private $notification_email_addresses = [];
 
     /**
      * config constructor.
      * @throws merge_exception
+     * @throws \dml_exception
      */
     function __construct() {
         global $CFG;
 
-            if (isset($CFG->merge_in_dir)) {
-                $this->in_dir = $CFG->merge_in_dir;
-                if (!is_dir($this->in_dir)) {
-                    throw new merge_exception('missing_directory', $this->in_dir);
+        $c = get_config(imisusermerge::COMPONENT_NAME);
+
+        if (isset($c->notification_email_addresses) && !empty($c->notification_email_addresses)) {
+            $this->notification_email_addresses = explode(',', $c->notification_email_addresses);
+            $bademails = [];
+            foreach ($this->notification_email_addresses as $email) {
+                if (!validate_email($email)) {
+                    $bademails[] = $email;
                 }
-            } else {
-                throw new merge_exception('missing_config', 'merge_in_dir');
             }
 
-            if (isset($CFG->merge_completed_dir)) {
-                $this->completed_dir = $CFG->merge_completed_dir;
-                if (!is_dir($this->completed_dir)) {
-                    throw new merge_exception('missing_directory', $this->completed_dir);
-                }
-            } else {
-                throw new merge_exception('missing_config', 'merge_completed_dir');
+            if (!empty($bademails)) {
+                throw new merge_exception('invalid_notification_recipient_emails', join(', ', $bademails));
             }
+        }
 
-            if (isset($CFG->merge_file_field_map)) {
-                $this->file_field_map = $CFG->merge_file_field_map;
-            } else {
-                throw new merge_exception('missing_config', 'merge_file_field_map');
+        if (isset($CFG->merge_in_dir)) {
+            $this->in_dir = $CFG->merge_in_dir;
+            if (!is_dir($this->in_dir)) {
+                throw new merge_exception('missing_directory', $this->in_dir);
             }
+        } else {
+            throw new merge_exception('missing_config', 'merge_in_dir');
+        }
 
-
-            if (isset($CFG->merge_file_name_regex)) {
-                $this->file_name_regex = $CFG->merge_file_name_regex;
-            } else {
-                throw new merge_exception('missing_config', '$file_name_regex');
+        if (isset($CFG->merge_completed_dir)) {
+            $this->completed_dir = $CFG->merge_completed_dir;
+            if (!is_dir($this->completed_dir)) {
+                throw new merge_exception('missing_directory', $this->completed_dir);
             }
+        } else {
+            throw new merge_exception('missing_config', 'merge_completed_dir');
+        }
+
+        if (isset($CFG->merge_file_field_map)) {
+            $this->file_field_map = $CFG->merge_file_field_map;
+        } else {
+            throw new merge_exception('missing_config', 'merge_file_field_map');
+        }
+
+        if (isset($CFG->merge_file_name_regex)) {
+            $this->file_name_regex = $CFG->merge_file_name_regex;
+        } else {
+            throw new merge_exception('missing_config', '$file_name_regex');
+        }
     }
 
-    public function get_in_dir() {
-        return $this->in_dir;
-    }
-
-    public function get_completed_dir() {
-    return $this->completed_dir;
-    }
-
-    public function get_file_name_regex() {
-        return $this->file_name_regex;
-    }
-
-    public function get_file_field_map() {
-        return $this->file_field_map;
+    /**
+     * @param $name
+     * @return mixed
+     * @throws \coding_exception
+     */
+    public function __get($name) {
+        if (isset($this->$name)) {
+            return $this->$name;
+        } else {
+            throw new \coding_exception("Attempt to access invalid config property $name");
+        }
     }
 
 }

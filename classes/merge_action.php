@@ -10,8 +10,6 @@ namespace local_imisusermerge;
 
 require_once(__DIR__ . "/../../../admin/tool/mergeusers/lib/mergeusertool.php");
 
-use MergeUserTool;
-
 /**
  * Class merge_action
  * @package local_imisusermerge
@@ -90,15 +88,13 @@ class merge_action {
 
             if (empty($vals)) {
                 $this->status = self::STATUS_INVALID;
-                throw new merge_exception('record_has_no_values', $this->asArray());
+                throw new merge_exception('record_has_no_values', $this->as_string_params());
             }
 
             if (count($vals) != count($map)) {
                 $this->status = self::STATUS_INVALID;
-                throw new merge_exception('invalid_record', $this->asArray());
+                throw new merge_exception('invalid_record', $this->as_string_params());
             }
-
-            $merge = [];
 
             $this->from_imisid = trim($vals[$map['from_imisid']]);
             $this->to_imisid = trim($vals[$map['to_imisid']]);
@@ -123,12 +119,10 @@ class merge_action {
     }
 
     /**
-     * @param $merge_tool
-     * @return int
      * @throws \dml_exception
      * @throws merge_exception
      */
-    public function merge(MergeUserTool $merge_tool) {
+    public function merge() {
 
         global $DB;
 
@@ -138,7 +132,7 @@ class merge_action {
 
             if ($from_imisid == $to_imisid) {
                 $this->status = self::STATUS_SKIPPED;
-                throw new merge_exception('same_user', $this->asArray());
+                throw new merge_exception('same_user', $this->as_string_params());
             }
 
             $missing = [];
@@ -151,7 +145,7 @@ class merge_action {
 
             if (!empty($missing)) {
                 $this->status = self::STATUS_ERROR;
-                throw new merge_exception('missing_user', $this->asArray());
+                throw new merge_exception('missing_user', $this->as_string_params());
             }
 
             // See if the from user has previously been merged
@@ -161,17 +155,18 @@ class merge_action {
             ]);
             if ($merged) {
                 $this->status = self::STATUS_SKIPPED;
-                throw new merge_exception('already_merged', $this->asArray());
+                throw new merge_exception('already_merged', $this->as_string_params());
             }
 
             // Do the merge
-            list($success, $log) = $merge_tool->merge((int)$this->to_user->id, (int)$this->from_user->id);
+            $result = imisusermerge::get_merge_tool()->merge((int)$this->to_user->id, (int)$this->from_user->id);
+            list($success, $log) = $result;
             if ($success) {
                 $this->status = self::STATUS_MERGED;
             } else {
                 $this->status = self::STATUS_FAILED;
                 $this->merge_tool_message = join("\n", (array)$log);
-                throw new merge_exception('merge_tool_failed', $this->asArray());
+                throw new merge_exception('merge_tool_failed', $this->as_string_params());
             }
 
         } catch (merge_exception $ex) {
@@ -279,13 +274,13 @@ class merge_action {
     }
 
     /**
-     * @return array
+     * @return Object
      */
-    public function asArray() {
+    public function as_string_params() {
         $vars = get_object_vars($this);
-        return array_filter($vars, function ($val) {
+        return (object) (array_filter($vars, function ($val) {
             return !is_array($val) && !is_object($val);
-        });
+        }));
     }
 
 }

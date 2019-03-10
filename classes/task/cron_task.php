@@ -40,41 +40,42 @@ class cron_task extends \core\task\scheduled_task {
         return get_string('crontask', 'local_imisusermerge');
     }
 
+    public function get_merge_tasks() {
+        global $DB;
+        $comp = imisusermerge::COMPONENT_NAME;
+        $class = '\\' . merge_task::class;
+        return $DB->get_records('task_adhoc', [
+            'component' => $comp,
+            'classname' => $class
+        ]);
+    }
+
     /**
-     * Run cron.
+     * @throws \coding_exception
      */
     public function execute() {
-        $current_task = $this->get_current_task();
-        $fail_delay_threshold = 100;
-
-        // If no task: create one
-        if (!$current_task) {
-            $next_task = new merge_task();
-            task_manager::queue_adhoc_task($next_task);
-        }
-
-    }
-
-    /**
-     * If a merge_task currently exists, fetch it
-     * @return merge_task|null
-     * @throws \dml_exception
-     */
-    protected function get_current_task() {
         global $DB;
 
-        $current_task = null;
+        $delay_threshold = 60*4; // 3 failures
 
-        $record = $DB->get_record('task_adhoc', [
-            'component' => imisusermerge::COMPONENT_NAME,
-            'classname' => merge_task::class
-        ]);
+        try {
+            $tasks = $this->get_merge_tasks();
 
-        if ($record) {
-            $current_task = self::adhoc_task_from_record($record);
+            if (count($tasks) > 1) {
+                throw new \coding_exception("More than one merge_tasks exist");
+
+            } else if (empty($tasks)) {
+                task_manager::queue_adhoc_task(new merge_task());
+            }
+
+        } catch (\Exception $ex) {
+            imisusermerge::send_notification(
+                get_string('failed_to_create_merge_task_email_subject', imisusermerge::COMPONENT_NAME),
+                get_string('failed_to_create_merge_task_email_body', imisusermerge::COMPONENT_NAME),
+                null,
+                $ex
+            );
         }
 
-        return $current_task;
     }
-
 }

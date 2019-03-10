@@ -21,6 +21,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . "/../../../admin/tool/mergeusers/lib/mergeusertool.php");
 require_once(__DIR__ . "/base.php");
 
+use local_imisusermerge\imisusermerge;
 use MergeUserTool;
 use local_imisusermerge\merge_action;
 use local_imisusermerge\merge_exception;
@@ -49,7 +50,6 @@ class merge_action_testcase extends base {
 
     /**
      *
-     * @throws \dml_exception
      */
     public function setUp() {
         parent::setup();
@@ -78,23 +78,22 @@ class merge_action_testcase extends base {
      */
     public function merge_create_invalid_line_dataset() {
         return [
-            'blank line' => ['', merge_action::STATUS_INVALID],
-            'missing from' => [',a1,1/1/2019,name,email@foo.com', merge_action::STATUS_INVALID],
-            'missing to' => ['a,,1/1/2019,name,email@foo.com', merge_action::STATUS_INVALID],
-            ['missing date' => 'a,a1,,name,email@foo.com', merge_action::STATUS_INVALID],
-            'bad date' => ['a,a1,notadate,name,email@foo.com', merge_action::STATUS_INVALID],
-            'too many field' => ['a,a1,1/1/2019,name,email@foo.com, z', merge_action::STATUS_INVALID],
-            'not enough fields' => ['a,a1,1/1/2019,name', merge_action::STATUS_INVALID],
+            'blank line' => [''],
+            'missing from' => [',a1,1/1/2019,name,email@foo.com'],
+            'missing to' => ['a,,1/1/2019,name,email@foo.com'],
+            ['missing date' => 'a,a1,,name,email@foo.com'],
+            'bad date' => ['a,a1,notadate,name,email@foo.com'],
+            'too many field' => ['a,a1,1/1/2019,name,email@foo.com, z'],
+            'not enough fields' => ['a,a1,1/1/2019,name'],
         ];
     }
 
     /**
      * @dataProvider merge_create_invalid_line_dataset
      * @param $line
-     * @param $expected_status
      * @throws merge_exception
      */
-    public function test_merge_create_invalid_line($line, $expected_status) {
+    public function test_merge_create_invalid_line($line) {
         $this->resetAfterTest(true);
 
         $this->expectException(merge_exception::class);
@@ -116,6 +115,8 @@ class merge_action_testcase extends base {
      * @dataProvider merge_missing_users_dataset
      * @param $line
      * @param $expected_status
+     * @throws merge_exception
+     * @throws \dml_exception
      */
     public function test_merge_missing_users($line, $expected_status) {
         $this->resetAfterTest(true);
@@ -123,11 +124,12 @@ class merge_action_testcase extends base {
         $this->getDataGenerator()->create_user(['username' => 'exists']);
 
         $m = new merge_action(1, $line, $this->map);
-        $mock = $this->getMergeToolMock();
-        $mock->expects($this->never())->method('merge');
+        $merge_tool_mock = $this->getMergeToolMock();
+        $merge_tool_mock->expects($this->never())->method('merge');
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
 
         try {
-            $m->merge($mock);
+            $m->merge();
             throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
 
         } catch (merge_exception $ex) {
@@ -187,14 +189,16 @@ class merge_action_testcase extends base {
 
         $merge_tool_mock = $this->getMergeToolMock();
         $merge_tool_mock->expects($this->never())->method('merge');
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
 
         $m = new merge_action(1, $line, $this->map);
 
         $mock = $this->getMergeToolMock();
         $mock->expects($this->never())->method('merge');
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
 
         try {
-            $m->merge($merge_tool_mock);
+            $m->merge();
             throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
 
         } catch (merge_exception $ex) {
@@ -209,13 +213,12 @@ class merge_action_testcase extends base {
     public function test_user_merged_only_once() {
         $this->resetAfterTest(true);
 
-        $user1 = $this->getDataGenerator()->create_user(['username' => 'user1']);
-        $user2 = $this->getDataGenerator()->create_user(['username' => 'user2']);
+        $this->create_users(range(1, 2));
 
         $line = 'user1,user2,1/1/2019,,';
 
         $m = new merge_action(1, $line, $this->map);
-        $m->merge(new MergeUserTool());
+        $m->merge();
         $this->assertEquals(merge_action::STATUS_MERGED, $m->getStatus(), 'status');
 
 
@@ -223,8 +226,10 @@ class merge_action_testcase extends base {
         $m = new merge_action(1, $line, $this->map);
         $merge_tool_mock = $this->getMergeToolMock();
         $merge_tool_mock->expects($this->never())->method('merge');
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
+
         try {
-            $m->merge($merge_tool_mock);
+            $m->merge();
             throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
 
         } catch (merge_exception $ex) {
@@ -239,16 +244,18 @@ class merge_action_testcase extends base {
     public function test_merge_fails() {
         $this->resetAfterTest(true);
 
-        $user1 = $this->getDataGenerator()->create_user(['username' => 'user1']);
-        $user2 = $this->getDataGenerator()->create_user(['username' => 'user2']);
+        $this->create_users(range(1, 2));
 
-        $merge_tool_mock = $this->getMergeToolMock();
         $line = 'user1,user2,1/1/2019,name,email@foo.com';
         $m = new merge_action(1, $line, $this->map);
-        $merge_tool_mock->method('merge')->willReturn([false, ['errors']]);
+        $merge_tool_mock = $this->getMergeToolMock();
+        $merge_tool_mock
+            ->method('merge')
+            ->willReturn([false, ['errors']]);
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
 
         try {
-            $m->merge($merge_tool_mock);
+            $m->merge();
             throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
 
         } catch (merge_exception $ex) {
