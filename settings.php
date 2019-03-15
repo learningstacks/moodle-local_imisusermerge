@@ -23,18 +23,22 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die;
-global $ADMIN;
+namespace local_imisusermerge;
 
+defined('MOODLE_INTERNAL') || die;
 /* @throws \dml_exception; */
 
+    if ($ADMIN->fulltree) {
+        $settings = new \admin_settingpage(
+            imisusermerge::COMPONENT_NAME,
+            \get_string('pluginname', imisusermerge::COMPONENT_NAME));
+        $ADMIN->add('localplugins', $settings);
 
-if ($ADMIN->fulltree) {
-    $settings->add(
-        new admin_setting_configtext(
-            'local_imisusermerge/notification_emails',
-            new lang_string('notification_emails_label', local_imisusermerge\imisusermerge::COMPONENT_NAME),
-            new lang_string('notification_emails_desc', local_imisusermerge\imisusermerge::COMPONENT_NAME),
+        $settings->add(
+        new \admin_setting_configtext(
+            'local_imisusermerge/notification_email_addresses',
+            new \lang_string('notification_emails_label', imisusermerge::COMPONENT_NAME),
+            new \lang_string('notification_emails_desc', imisusermerge::COMPONENT_NAME),
             '',
             PARAM_TEXT));
 }

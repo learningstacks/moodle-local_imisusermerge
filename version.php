@@ -18,7 +18,7 @@
 defined('MOODLE_INTERNAL') || die;
 
 $plugin->component = 'local_imisusermerge'; // Full name of the plugin (used for diagnostics)
-$plugin->version   = 2019031001;       // The current plugin version (Date: YYYYMMDDXX)
+$plugin->version   = 2019031401;       // The current plugin version (Date: YYYYMMDDXX)
 $plugin->release = 'v1.0.0';
 $plugin->requires  = 2016120502;       // Requires this Moodle version
 $plugin->dependencies = array(

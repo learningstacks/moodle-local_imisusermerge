@@ -6,6 +6,8 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . "/base.php");
 
 use local_imisusermerge\config;
+use local_imisusermerge\imisusermerge;
+use local_imisusermerge\merge_exception;
 
 class config_testcase extends base {
 
@@ -19,121 +21,61 @@ class config_testcase extends base {
         parent::tearDown();
     }
 
-    public function config_dataset() {
+
+    public function test_valid_config() {
+        $this->resetAfterTest(true);
+
+        $config = new config();
+        $this->assertEquals("{$this->base_dir}/todo", $config->in_dir);
+        $this->assertEquals("{$this->base_dir}/completed", $config->completed_dir);
+        $this->assertEquals("/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i", $config->file_name_regex);
+        $this->assertEquals('from_imisid', $config->file_field_map['duplicateid']);
+        $this->assertEquals('to_imisid', $config->file_field_map['mergetoid']);
+        $this->assertEquals('merge_time', $config->file_field_map['dateofmerge']);
+        $this->assertEquals(2, count($config->notification_email_addresses));
+        $this->assertEquals('someone@somewhere.com', $config->notification_email_addresses[0]);
+        $this->assertEquals('someone2@somewhere.com', $config->notification_email_addresses[0]);
+    }
+
+    // public function test_valid_config_variations() {
+
+    // }
+
+    public function invalid_config_dataset() {
         return [
-            [
-                [
-                    'merge_in_dir' => "{$this->base_dir}/todo",
-                    'merge_completed_dir' => "{$this->base_dir}/completed",
-                    'merge_file_field_map' => [
-                        'duplicateid' => 'from_imisid',
-                        'mergetoid' => 'to_imisid',
-                        'dateofmerge' => 'merge_time',
-                        'full_name' => 'full_name',
-                        'email' => 'email'
-                    ],
-                    'merge_file_name_regex' => "/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i"
-                ],
-                false
-            ],
-            [
-                [
-                    'merge_in_dir' => null,
-                    'merge_completed_dir' => "{$this->base_dir}/completed",
-                    'merge_file_field_map' => [
-                        'duplicateid' => 'from_imisid',
-                        'mergetoid' => 'to_imisid',
-                        'dateofmerge' => 'merge_time',
-                        'full_name' => 'full_name',
-                        'email' => 'email'
-                    ],
-                    'merge_file_name_regex' => "/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i"
-                ],
-                true
-            ],
-            [
-                [
-                    'merge_in_dir' => "{$this->base_dir}/todo",
-                    'merge_completed_dir' => null,
-                    'merge_file_field_map' => [
-                        'duplicateid' => 'from_imisid',
-                        'mergetoid' => 'to_imisid',
-                        'dateofmerge' => 'merge_time',
-                        'full_name' => 'full_name',
-                        'email' => 'email'
-                    ],
-                    'merge_file_name_regex' => "/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i"
-                ],
-                true
-            ],
-            [
-                [
-                    'merge_in_dir' => "{$this->base_dir}/todo",
-                    'merge_completed_dir' => "{$this->base_dir}/completed",
-                    'merge_file_field_map' => [],
-                    'merge_file_name_regex' => "/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i"
-                ],
-                true
-            ],
-            [
-                [
-                    'merge_in_dir' => "{$this->base_dir}/todo",
-                    'merge_completed_dir' => "{$this->base_dir}/completed",
-                    'merge_file_field_map' => [
-                        'duplicateid' => 'from_imisid',
-                        'mergetoid' => 'to_imisid',
-                        'dateofmerge' => 'merge_time',
-                        'full_name' => 'full_name',
-                        'email' => 'email'
-                    ],
-                    'merge_file_name_regex' => null
-                ],
-                true
-            ],
+            "merge_in_dir not set" => ["unset(\$CFG->merge_in_dir);"],
+            "merge_in_dir = null" => ["\$CFG->merge_in_dir = null;"],
+            "merge_in_dir = empty string" => ["\$CFG->merge_in_dir = '';"],
+            "merge_completed_dir not set" => ["unset(\$CFG->merge_completed_dir);"],
+            "merge_completed_dir = null" => ["\$CFG->merge_completed_dir = null;"],
+            "merge_completed_dir = empty string" => ["\$CFG->merge_completed_dir = '';"],
+            "merge_file_name_regex not set" => ["unset(\$CFG->merge_file_name_regex);"],
+            "merge_file_name_regex = null" => ["\$CFG->merge_file_name_regex = null;"],
+            "merge_file_name_regex = empty string" => ["\$CFG->merge_file_name_regex = '';"],
+
+            "merge_file_field_map not set" => ["unset(\$CFG->merge_file_field_map);"],
+            "merge_file_field_map = null" => ["\$CFG->merge_file_field_map = null;"],
+            "merge_file_field_map = empty array" => ["\$CFG->merge_file_field_map = [];"],
+
+            "merge_file_field_map[from_imisid] is not set" => ["unset(\$CFG->merge_file_field_map['from_imisid']);"],
+            "merge_file_field_map[from_imisid] is null" => ["\$CFG->merge_file_field_map['from_imisid'] = null;"],
+            "merge_file_field_map[from_imisid] is empty string" => ["\$CFG->merge_file_field_map['from_imisid'] = 'aa';"],
+
         ];
     }
 
-    protected function set_config(Array $vals) {
+    /**
+     * @dataProvider invalid_config_dataset
+     * @param $action
+     * @throws \dml_exception
+     * @throws merge_exception
+     */
+    public function test_invalid_config($action) {
+        $this->resetAfterTest(true);
         global $CFG;
 
-        foreach ($vals as $name => $val) {
-            if (!empty($val)) {
-                $CFG->$name = $val;
-            } else {
-                unset($CFG->$name);
-            }
-        }
+        eval($action);
+        $this->expectException(merge_exception::class);
+        $config = new config();
     }
-
-    /**
-     * @dataProvider config_dataset
-     * @param $data
-     * @param $expect_exception
-     * @throws \Exception
-     */
-    public function test_get_config_values($data, $expect_exception) {
-        $this->resetAfterTest(true);
-
-        $this->set_config($data);
-        try {
-            $config = new config();
-            if ($expect_exception) {
-                $this->fail("Exception expected");
-            }
-
-            $this->assertEquals($data['merge_in_dir'], $config->in_dir);
-            $this->assertEquals($data['merge_completed_dir'], $config->completed_dir);
-            $this->assertEquals($data['merge_file_name_regex'], $config->file_name_regex);
-            $map = $config->file_field_map;
-            foreach($data['merge_file_field_map'] as $name => $val) {
-                $this->assertEquals($val, $map[$name], "$name");
-            }
-
-        } catch (\Exception $ex) {
-            if (!$expect_exception) {
-                throw $ex;
-            }
-        }
-    }
-
 }

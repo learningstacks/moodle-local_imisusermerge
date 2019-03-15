@@ -41,20 +41,18 @@ abstract class base extends \advanced_testcase {
 
         global $CFG;
 
+        // Set a valid config
         $this->file_base = "user_merge_request_";
-
         $CFG->merge_in_dir = $this->in_dir = "C:/dev/IAFF/merge_requests/todo";
         $CFG->merge_completed_dir = $this->completed_dir = "C:/dev/IAFF/merge_requests/completed";
         $CFG->merge_file_name_regex = $this->file_name_regex = "/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i";
         $CFG->merge_file_field_map = $this->file_field_map = [
             'duplicateid' => 'from_imisid',
             'mergetoid' => 'to_imisid',
-            'dateofmerge' => 'merge_time',
-            'full_name' => 'full_name',
-            'email' => 'email'
+            'dateofmerge' => 'merge_time'
         ];
-
-        set_config('notification_email_addresses', 'a@a.com,b@b.com', imisusermerge::COMPONENT_NAME);
+        $this->notification_email_addresses = 'someone@somewhere.com;someone2@somewhere.com';
+        set_config('notification_email_addresses', $this->notification_email_addresses, imisusermerge::COMPONENT_NAME);
 
         $this->delete_all_files();
         imisusermerge::set_mock_merge_tool(null);
@@ -196,7 +194,7 @@ abstract class base extends \advanced_testcase {
     protected function create_users($range) {
         $users = [];
 
-        foreach($range as $num) {
+        foreach ($range as $num) {
             $users[$num] = $this->getDataGenerator()->create_user([
                 'username' => "user{$num}"
             ]);
@@ -212,7 +210,7 @@ abstract class base extends \advanced_testcase {
     protected function do_adhoc_tasks() {
         $tasks = [];
 
-        while($task = \core\task\manager::get_next_adhoc_task(time())) {
+        while ($task = \core\task\manager::get_next_adhoc_task(time())) {
             $this->assertInstanceOf(merge_task::class, $task);
 
             try {

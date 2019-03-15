@@ -18,7 +18,16 @@
 $string['pluginname'] = 'IMIS User Merge';
 $string['pluginname_desc'] = 'Merges user accounts based on merged user csv file';
 
-// email strings
+/*
+ * Settings
+ */
+$string['notification_emails_label'] = "Notification Emails";
+$string['notification_emails_desc'] = "List of email addresses to which notification emails will be sent.
+Enter one or more email addresses, separated by semi-colons";
+
+/*
+ * Email strings
+ */
 $string['user_merge_failed_email_subject'] = 'User merge failed';
 $string['user_merge_failed_email_body'] = 'Failure occured while processing a merge request file:
 File: {$a->filepath}
