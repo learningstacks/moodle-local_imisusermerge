@@ -43,18 +43,21 @@ class merge_action_testcase extends base {
     private $map = [
         'from_imisid' => 0,
         'to_imisid' => 1,
-        'merge_time' => 2,
-        'full_name' => 3,
-        'email' => 4
+        'merge_time' => 2
     ];
 
+
     /**
-     *
+     * @throws \coding_exception
+     * @throws merge_exception
      */
     public function setUp() {
         parent::setup();
     }
 
+    /**
+     *
+     */
     public function tearDown() {
         parent::tearDown();
     }
@@ -79,12 +82,12 @@ class merge_action_testcase extends base {
     public function merge_create_invalid_line_dataset() {
         return [
             'blank line' => [''],
-            'missing from' => [',a1,1/1/2019,name,email@foo.com'],
-            'missing to' => ['a,,1/1/2019,name,email@foo.com'],
-            ['missing date' => 'a,a1,,name,email@foo.com'],
-            'bad date' => ['a,a1,notadate,name,email@foo.com'],
+            'missing from' => [',a1,1/1/2019'],
+            'missing to' => ['a,,1/1/2019'],
+            ['missing date' => 'a,a1,'],
+            'bad date' => ['a,a1,notadate'],
             'too many field' => ['a,a1,1/1/2019,name,email@foo.com, z'],
-            'not enough fields' => ['a,a1,1/1/2019,name'],
+            'not enough fields' => ['a,a1'],
         ];
     }
 
@@ -105,9 +108,9 @@ class merge_action_testcase extends base {
      */
     public function merge_missing_users_dataset() {
         return [
-            'missing from' => ['exists,missing,1/1/2019,name,email@foo.com', merge_action::STATUS_ERROR],
-            'missing to' => ['missing,exists,1/1/2019,name,email@foo.com', merge_action::STATUS_ERROR],
-            'missing both' => ['missing1,missing2,1/1/2019,name,email@foo.com', merge_action::STATUS_ERROR],
+            'missing from' => ['exists,missing,1/1/2019', merge_action::STATUS_ERROR],
+            'missing to' => ['missing,exists,1/1/2019', merge_action::STATUS_ERROR],
+            'missing both' => ['missing1,missing2,1/1/2019', merge_action::STATUS_ERROR],
         ];
     }
 
@@ -143,8 +146,8 @@ class merge_action_testcase extends base {
      */
     public function create_valid_line_dataset() {
         return [
-            'no spaces' => ['a,a1,1/1/2019,name,email@foo.com', merge_action::STATUS_TODO, 'a', 'a1', strtotime('1/1/2019')],
-            'spaces' => [' a , a1 , 1/1/2019 , name , email@foo.com ', merge_action::STATUS_TODO, 'a', 'a1', strtotime('1/1/2019')],
+            'no spaces' => ['a,a1,1/1/2019', merge_action::STATUS_TODO, 'a', 'a1', strtotime('1/1/2019')],
+            'spaces' => [' a , a1 , 1/1/2019 ', merge_action::STATUS_TODO, 'a', 'a1', strtotime('1/1/2019')],
         ];
     }
 
@@ -173,7 +176,7 @@ class merge_action_testcase extends base {
      */
     public function merge_skips_dataset() {
         return [
-            'same users' => ['user1,user1,1/1/2019,name,email@foo.com', merge_action::STATUS_SKIPPED],
+            'same users' => ['user1,user1,1/1/2019', merge_action::STATUS_SKIPPED],
         ];
     }
 
@@ -181,8 +184,8 @@ class merge_action_testcase extends base {
      * @dataProvider merge_skips_dataset
      * @param $line
      * @param $expected_status
-     * @throws \dml_exception
      * @throws merge_exception
+     * @throws \dml_exception
      */
     public function test_merge_skips($line, $expected_status) {
         $this->resetAfterTest(true);
@@ -207,15 +210,15 @@ class merge_action_testcase extends base {
     }
 
     /**
-     * @throws \dml_exception
      * @throws merge_exception
+     * @throws \dml_exception
      */
     public function test_user_merged_only_once() {
         $this->resetAfterTest(true);
 
         $this->create_users(range(1, 2));
 
-        $line = 'user1,user2,1/1/2019,,';
+        $line = 'user1,user2,1/1/2019';
 
         $m = new merge_action(1, $line, $this->map);
         $m->merge();
@@ -238,15 +241,15 @@ class merge_action_testcase extends base {
     }
 
     /**
-     * @throws \dml_exception
      * @throws merge_exception
+     * @throws \dml_exception
      */
     public function test_merge_fails() {
         $this->resetAfterTest(true);
 
         $this->create_users(range(1, 2));
 
-        $line = 'user1,user2,1/1/2019,name,email@foo.com';
+        $line = 'user1,user2,1/1/2019';
         $m = new merge_action(1, $line, $this->map);
         $merge_tool_mock = $this->getMergeToolMock();
         $merge_tool_mock

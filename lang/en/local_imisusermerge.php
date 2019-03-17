@@ -46,3 +46,17 @@ See the attached files for additional detail.
 $string['failed_to_create_merge_task_email_subject'] = 'Failed to create merge_users task';
 $string['failed_to_create_merge_task_email_body'] = 'While running the cron, an attempt to create a merge_user task failed';
 
+// Errors
+$string['invalid_config'] = 'Invalid configuration settings: 
+{$a}';
+$string['invalid_merge_in_dir'] = 'Invalid merge_in_dir setting: ({$a})';
+$string['invalid_merge_completed_dir'] = 'Invalid merge_completed_dir setting: ({$a})';
+$string['invalid_merge_file_field_map'] = 'Invalid merge_ifile_field_map setting: ({$a})';
+$string['invalid_merge_file_name_regex'] = 'Invalid merge_ifile_name_regex setting: ({$a})';
+$string['invalid_notification_email_addresses'] = 'Invalid notification_email_addresses: ({$a})';
+$string['email_send_failed'] = 'Failure occured attempting to send notification email: 
+{$a}';
+$string['missing_email_attachment'] = 'Failure occured attempting to send notification email: 
+{$a}';
+$string['file_missing_fields'] = 'File is missing required fields';
+$string['empty_file'] = "File contains no data";

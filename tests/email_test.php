@@ -8,16 +8,30 @@ require_once(__DIR__ . "/base.php");
 use local_imisusermerge\imisusermerge;
 use local_imisusermerge\merge_exception;
 
+/**
+ * Class email_testcase
+ * @package local_imisusermerge\tests
+ */
 class email_testcase extends base {
 
+    /**
+     * @throws \coding_exception
+     * @throws merge_exception
+     */
     public function setUp() {
         parent::setup();
     }
 
+    /**
+     *
+     */
     public function tearDown() {
         parent::tearDown();
     }
 
+    /**
+     * @throws merge_exception
+     */
     public function test_send_email_no_email_addresses() {
         $this->resetAfterTest(true);
 
@@ -34,6 +48,9 @@ class email_testcase extends base {
 
     }
 
+    /**
+     * @throws merge_exception
+     */
     public function test_send_email_with_attachment_and_exception() {
         $this->resetAfterTest(true);
 

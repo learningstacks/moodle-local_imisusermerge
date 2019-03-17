@@ -23,6 +23,9 @@ class merge_task extends \core\task\adhoc_task {
      */
     private $merge_file = null;
 
+    /**
+     * merge_task constructor.
+     */
     function __construct() {
         $this->set_component(imisusermerge::COMPONENT_NAME);
     }

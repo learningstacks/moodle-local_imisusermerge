@@ -9,16 +9,30 @@ use local_imisusermerge\imisusermerge;
 use local_imisusermerge\task\merge_task;
 use core\task\manager as task_manager;
 
+/**
+ * Class merge_task_testcase
+ * @package local_imisusermerge\tests
+ */
 class merge_task_testcase extends base {
 
+    /**
+     * @throws \coding_exception
+     * @throws \local_imisusermerge\merge_exception
+     */
     public function setUp() {
         parent::setup();
     }
 
+    /**
+     *
+     */
     public function tearDown() {
         parent::tearDown();
     }
 
+    /**
+     * @return array
+     */
     public function task_with_file_dataset() {
         return [
             'No File' => [
@@ -29,16 +43,16 @@ class merge_task_testcase extends base {
 
             'No Data' => [
                 [
-                    'duplicateid,mergetoid,dateofmerge,full_name,email'
+                    'duplicateid,mergetoid,dateofmerge'
                 ],
                 true
             ],
 
             'Non Matching Lines' => [
                 [
-                    'duplicateid,mergetoid,dateofmerge,full_name,email',
-                    'a,a1,1/1/2019,name,email@email.com',
-                    'a,a1,1/1/2019,name', // missing email
+                    'duplicateid,mergetoid,dateofmerge',
+                    'a,a1,1/1/2019',
+                    'a,a1', // missing email
                 ],
                 false
             ]
@@ -86,13 +100,13 @@ class merge_task_testcase extends base {
         $users = $this->create_users(range(1, 4));
 
         $path1 = $this->write_request_file("20190101-000002", [
-            'duplicateid,mergetoid,dateofmerge,full_name,email',
-            'user1,user2,1/1/2019,name,email@email.com'
+            'duplicateid,mergetoid,dateofmerge',
+            'user1,user2,1/1/2019'
         ]);
 
         $path2 = $this->write_request_file("20190101-000001", [
-            'duplicateid,mergetoid,dateofmerge,full_name,email',
-            'user3,user4,1/1/2019,name,email@email.com'
+            'duplicateid,mergetoid,dateofmerge',
+            'user3,user4,1/1/2019'
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();

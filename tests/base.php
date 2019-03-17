@@ -5,7 +5,9 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . "/../../../admin/tool/mergeusers/lib/mergeusertool.php");
 
 use local_imisusermerge\imisusermerge;
+use local_imisusermerge\merge_file;
 use local_imisusermerge\task\merge_task;
+use local_imisusermerge\config;
 use \MergeUserTool;
 
 /**
@@ -15,44 +17,30 @@ use \MergeUserTool;
 abstract class base extends \advanced_testcase {
 
     /**
-     * @var
+     * @var config
      */
-    protected $file_base;
-    protected $in_dir;
-    /**
-     * @var
-     */
-    protected $completed_dir;
-    /**
-     * @var
-     */
-    protected $file_name_regex;
-    /**
-     * @var
-     */
-    protected $file_field_map;
-
-    protected $notification_email_addresses;
+    protected $config;
 
     /**
      *
+     * @throws \coding_exception
+     * @throws \local_imisusermerge\merge_exception
      */
     public function setup() {
 
         global $CFG;
 
-        // Set a valid config
-        $this->file_base = "user_merge_request_";
-        $CFG->merge_in_dir = $this->in_dir = "C:/dev/IAFF/merge_requests/todo";
-        $CFG->merge_completed_dir = $this->completed_dir = "C:/dev/IAFF/merge_requests/completed";
-        $CFG->merge_file_name_regex = $this->file_name_regex = "/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i";
-        $CFG->merge_file_field_map = $this->file_field_map = [
-            'duplicateid' => 'from_imisid',
-            'mergetoid' => 'to_imisid',
-            'dateofmerge' => 'merge_time'
-        ];
-        $this->notification_email_addresses = 'someone@somewhere.com;someone2@somewhere.com';
-        set_config('notification_email_addresses', $this->notification_email_addresses, imisusermerge::COMPONENT_NAME);
+        if (!is_dir($CFG->phpunit_merge_in_dir)) {
+            throw new \coding_exception("phpunit_merge_in_dir not set");
+        }
+
+        if (!is_dir($CFG->phpunit_merge_completed_dir)) {
+            throw new \coding_exception("phpunit_merge_completed_dir not set");
+        }
+
+        $CFG->merge_in_dir = $CFG->phpunit_merge_in_dir;
+        $CFG->merge_completed_dir = $CFG->phpunit_merge_completed_dir;
+        $this->config = new config();
 
         $this->delete_all_files();
         imisusermerge::set_mock_merge_tool(null);
@@ -66,18 +54,55 @@ abstract class base extends \advanced_testcase {
     }
 
     /**
+     * Set $CFG and config_plugins data
+     * @param array $data
      */
-    public function delete_all_files() {
-        $files = glob("{$this->in_dir}/*"); // get all file names
-        foreach ($files as $file) { // iterate files
-            if (is_file($file))
-                unlink($file); // delete file
+    public function set_test_config($data = []) {
+        global $CFG;
+
+        $data = (array)$data;
+
+        $cfg_fields = [
+            'merge_in_dir',
+            'merge_completed_dir'
+        ];
+        foreach ($cfg_fields as $name) {
+            if (isset($data[$name])) {
+                $CFG->$name = $data[$name];
+            } else {
+                unset($CFG->$name);
+            }
         }
 
-        $files = glob("{$this->completed_dir}/*"); // get all file names
-        foreach ($files as $file) { // iterate files
-            if (is_file($file))
-                unlink($file); // delete file
+        if (isset($data['notification_email_addresses'])) {
+            set_config(
+                'notification_email_addresses',
+                $data['notification_email_addresses'],
+                imisusermerge::COMPONENT_NAME);
+        } else {
+            unset_config(
+                'notification_email_addresses',
+                imisusermerge::COMPONENT_NAME);
+        }
+    }
+
+    /**
+     */
+    public function delete_all_files() {
+        if (is_dir($this->config->in_dir)) {
+            $files = glob("{$this->config->in_dir}/{$this->config->file_base}*"); // get all file names
+            foreach ($files as $file) { // iterate files
+                if (is_file($file))
+                    unlink($file); // delete file
+            }
+        }
+
+        if (is_dir($this->config->completed_dir)) {
+            $files = glob("{$this->config->completed_dir}/{$this->config->file_base}*"); // get all file names
+            foreach ($files as $file) { // iterate files
+                if (is_file($file))
+                    unlink($file); // delete file
+            }
         }
     }
 
@@ -87,7 +112,7 @@ abstract class base extends \advanced_testcase {
      * @return string
      */
     protected function write_request_file($datetime, $data = []) {
-        $path = "{$this->in_dir}/user_merge_request_{$datetime}.csv";
+        $path = "{$this->config->in_dir}/user_merge_request_{$datetime}.csv";
         file_put_contents($path, join("\n", $data));
         return $path;
     }
@@ -136,7 +161,7 @@ abstract class base extends \advanced_testcase {
      */
     protected function get_completed_file_path($path) {
         $filename = pathinfo($path, PATHINFO_FILENAME);
-        return "{$this->completed_dir}/{$filename}.csv";
+        return "{$this->config->completed_dir}/{$filename}.csv";
     }
 
     /**
@@ -145,7 +170,7 @@ abstract class base extends \advanced_testcase {
      */
     protected function get_completed_log_path($path) {
         $filename = pathinfo($path, PATHINFO_FILENAME);
-        return "{$this->completed_dir}/{$filename}_log.csv";
+        return "{$this->config->completed_dir}/{$filename}_log.json";
     }
 
     /**
@@ -154,7 +179,7 @@ abstract class base extends \advanced_testcase {
      */
     protected function get_failed_log_path($path) {
         $filename = pathinfo($path, PATHINFO_FILENAME);
-        return "{$this->in_dir}/{$filename}_log.csv";
+        return "{$this->config->in_dir}/{$filename}_log.json";
     }
 
     /**
@@ -226,6 +251,37 @@ abstract class base extends \advanced_testcase {
 
         return $tasks;
 
+    }
+
+    /**
+     * @param $path
+     * @param merge_file $merge_file
+     */
+    public function assert_log_file_contents($path, $merge_file) {
+        /* @var object */
+        $log = json_decode(file_get_contents($path));
+        $check_props = [
+            'config',
+            'status',
+            'message',
+            'filepath',
+            'lines',
+            'headers',
+            'missing_fields',
+            'fldpos_map',
+            'merges',
+            'ambiguous_merges'];
+        foreach ($check_props as $prop) {
+            $logval = $log->$prop;
+            $expval = $merge_file->$prop;
+            if (is_array($expval)) {
+                $this->assertEquals(json_encode($expval), json_encode($logval), $prop);
+            } else if (is_object($expval)) {
+                $this->assertEquals(json_encode($expval), json_encode($logval), $prop);
+            } else {
+                $this->assertEquals($expval, $logval, $prop);
+            }
+        }
     }
 
 }

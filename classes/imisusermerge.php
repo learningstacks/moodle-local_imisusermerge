@@ -29,7 +29,7 @@ abstract class imisusermerge {
     /**
      * @return config
      * @throws merge_exception
-     * @throws \dml_exception
+     * @throws \coding_exception
      */
     public static function get_config() {
         if (!static::$config) {
@@ -39,6 +39,9 @@ abstract class imisusermerge {
         return static::$config;
     }
 
+    /**
+     * @param null $config
+     */
     public static function set_config($config = null) {
         static::$config = $config;
     }
@@ -46,7 +49,7 @@ abstract class imisusermerge {
     /**
      * @param string $subject
      * @param string $body
-     * @param array|null $file
+     * @param array $files
      * @param \Exception|null $exception
      * @return bool
      *
@@ -67,9 +70,9 @@ abstract class imisusermerge {
         }
 
         if (is_array($files)) {
-            foreach($files as $file) {
+            foreach ($files as $file) {
                 if (!is_file($file)) {
-                    throw new merge_exception('missing_email_attachment',$file );
+                    throw new merge_exception('missing_email_attachment', $file);
                 }
             }
         }
@@ -98,7 +101,7 @@ abstract class imisusermerge {
                 $mail->Body = $mailbody;
 
                 if (is_array($files)) {
-                    foreach($files as $file) {
+                    foreach ($files as $file) {
                         $mail->addAttachment($file);
                     }
                 }
@@ -129,7 +132,7 @@ abstract class imisusermerge {
                         mtrace('Error: local_imisusermerge::send_notification(): ' . $mail->ErrorInfo);
                     }
 
-                    throw new merge_exception('email_send_failed', $mail->ErrorInfo);
+                    throw new merge_exception('send_notification_failed', $mail->ErrorInfo);
                 }
             }
 
@@ -137,7 +140,7 @@ abstract class imisusermerge {
             throw $ex;
 
         } catch (\Exception $ex) {
-            throw new merge_exception('imisusermerge::send_notification() failed', $ex->getMessage());
+            throw new merge_exception('send_notification_failed', $ex->getMessage());
         }
 
         return true;
@@ -155,6 +158,17 @@ abstract class imisusermerge {
      */
     public static function get_merge_tool() {
         return (self::$mock_merge_tool) ? self::$mock_merge_tool : new \MergeUserTool();
+    }
+
+    /**
+     * @param $id
+     * @param null $a
+     * @param bool $lazyload
+     * @return string
+     * @throws \coding_exception
+     */
+    public function get_string($id, $a = null, $lazyload = false) {
+        return get_string($id, self::COMPONENT_NAME, $a, $lazyload);
     }
 
 }

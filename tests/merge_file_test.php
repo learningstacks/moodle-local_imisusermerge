@@ -31,8 +31,10 @@ use local_imisusermerge\merge_exception;
  */
 class merge_file_testcase extends base {
 
+
     /**
-     *
+     * @throws \coding_exception
+     * @throws merge_exception
      */
     public function setUp() {
         parent::setup();
@@ -54,6 +56,7 @@ class merge_file_testcase extends base {
     /**
      *
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function test_get_next_file_no_files() {
         $this->resetAfterTest(true);
@@ -64,16 +67,17 @@ class merge_file_testcase extends base {
     /**
      *
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function test_get_next_file_multiple_files() {
         $this->resetAfterTest(true);
 
         for ($num = 3; $num >= 1; $num--) {
-            touch("{$this->in_dir}/user_merge_request_20190101-00000{$num}.csv");
+            touch("{$this->config->in_dir}/user_merge_request_20190101-00000{$num}.csv");
         }
         for ($num = 1; $num <= 3; $num++) {
             $this->assertEquals("user_merge_request_20190101-00000{$num}.csv", merge_file::get_next_file());
-            unlink("{$this->in_dir}/user_merge_request_20190101-00000{$num}.csv");
+            unlink("{$this->config->in_dir}/user_merge_request_20190101-00000{$num}.csv");
         }
     }
 
@@ -81,13 +85,15 @@ class merge_file_testcase extends base {
      *
      * @throws merge_exception
      * @throws merge_exception
+     * @throws \coding_exception
+     * @throws \coding_exception
      */
     public function test_process_missing_headers() {
         $this->resetAfterTest(true);
 
         $path = $this->write_request_file("20190101-000000", [
-            'duplicateid,mergetoid,full_name,email',
-            'a,a1,1/1/2019,name,email@email.com'
+            'duplicateid,mergetoid',
+            'a,a1'
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();
@@ -101,19 +107,21 @@ class merge_file_testcase extends base {
 
         } catch (merge_exception $ex) {
             $this->assertFailedFiles($path);
+            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
         }
     }
 
     /**
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function test_process_non_matching_lines() {
         $this->resetAfterTest(true);
 
         $path = $this->write_request_file("20190101-000000", [
-            'duplicateid,mergetoid,dateofmerge,full_name,email',
-            'a,a1,1/1/2019,name,email@email.com',
-            'a,a1,1/1/2019,name', // missing email
+            'duplicateid,mergetoid,dateofmerge',
+            'a,a1,1/1/2019,',
+            'a,a1,1/1/2019,a' // missing email
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();
@@ -127,11 +135,14 @@ class merge_file_testcase extends base {
 
         } catch (merge_exception $ex) {
             $this->assertFailedFiles($path);
+            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
         }
     }
 
     /**
      * @throws merge_exception
+     * @throws \coding_exception
+     * @throws \coding_exception
      */
     public function test_process_sort_blank_lines_skips() {
         $this->resetAfterTest(true);
@@ -149,12 +160,12 @@ class merge_file_testcase extends base {
         $this->assertTrue($success);
 
         $path = $this->write_request_file("20190101-000000", [
-            'duplicateid,mergetoid,dateofmerge,full_name,email',
-            'user1,user2,1/1/2019 00:00:02,,',
+            'duplicateid,mergetoid,dateofmerge',
+            'user1,user2,1/1/2019 00:00:02',
             '',
-            'user5,user6,1/1/2019 00:00:03,,', // skip: already merged
-            'user3,user4,1/1/2019 00:00:01,,',
-            'user7,user7,1/1/2019 00:00:01,,', // skip: from = to
+            'user5,user6,1/1/2019 00:00:03', // skip: already merged
+            'user3,user4,1/1/2019 00:00:01',
+            'user7,user7,1/1/2019 00:00:01', // skip: from = to
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();
@@ -170,7 +181,11 @@ class merge_file_testcase extends base {
         $f = new merge_file($path);
         $f->process();
 
+        $this->assertEquals(0, $f->failed, 'failed count');
+        $this->assertEquals(2, $f->completed, 'completed count');
+        $this->assertEquals(2, $f->skipped, 'skipped count');
         $this->assertSuccessFiles($path);
+        $this->assert_log_file_contents($this->get_completed_log_path($path), $f);
     }
 
     /**
@@ -180,18 +195,28 @@ class merge_file_testcase extends base {
         return [
             [
                 [
-                    'duplicateid,mergetoid,dateofmerge,full_name,email',
-                    'user1,user2,1/1/2019 00:00:01,,', // Should work
-                    'user5,user2,1/1/2019 00:00:02,,', // SMissing from, hould cause error
-                    'user3,user4,1/1/2019 00:00:03,,', // Should not be attempted
+                    'duplicateid,mergetoid,dateofmerge',
+                    'user1,user2,1/1/2019 00:00:01', // Should work
+                    'user5,user2,1/1/2019 00:00:02', // SMissing from, should cause error
+                    'user3,user4,1/1/2019 00:00:03', // Should not be attempted
+                ],
+                [
+                    'failed' => 1,
+                    'skipped' => 0,
+                    'completed' => 1
                 ]
             ],
             [
                 [
-                    'duplicateid,mergetoid,dateofmerge,full_name,email',
-                    'user1,user2,1/1/2019 00:00:01,,', // Should work
-                    'user2,user5,1/1/2019 00:00:02,,', // Missing to, hould cause error
-                    'user3,user4,1/1/2019 00:00:03,,', // Should not be attempted
+                    'duplicateid,mergetoid,dateofmerge',
+                    'user1,user2,1/1/2019 00:00:01', // Should work
+                    'user2,user5,1/1/2019 00:00:02', // Missing to, hould cause error
+                    'user3,user4,1/1/2019 00:00:03', // Should not be attempted
+                ],
+                [
+                    'failed' => 1,
+                    'skipped' => 0,
+                    'completed' => 1
                 ]
             ]
         ];
@@ -201,8 +226,10 @@ class merge_file_testcase extends base {
      * @dataProvider missing_user_dataset
      * @param $data
      * @throws merge_exception
+     * @throws \coding_exception
+     * @throws \coding_exception
      */
-    public function test_process_error_missing_user($data) {
+    public function test_process_error_missing_user($data, $expected) {
         $this->resetAfterTest(true);
         $users = $this->create_users(range(1, 4));
 
@@ -222,23 +249,30 @@ class merge_file_testcase extends base {
             throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
 
         } catch (merge_exception $ex) {
+            $this->assertEquals($expected['failed'], $f->failed, 'failed count');
+            $this->assertEquals($expected['completed'], $f->completed, 'completed count');
+            $this->assertEquals($expected['skipped'], $f->skipped, 'skipped count');
+
             $this->assertEquals('STATUS_ERROR', $f->getStatus());
             $this->assertFailedFiles($path);
+            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
+
         }
     }
 
 
     /**
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function test_process_ambiguous_merges() {
         $this->resetAfterTest(true);
 
         $path = $this->write_request_file("20190101-000000", [
-            'duplicateid,mergetoid,dateofmerge,full_name,email',
-            'user1,user2,1/1/2019 00:00:02,,', // ok
-            'user3,user4,1/1/2019 00:00:03,,', // fail
-            'user5,user6,1/1/2019 00:00:01,,', // not attempted
+            'duplicateid,mergetoid,dateofmerge',
+            'user1,user2,1/1/2019 00:00:02', // ok
+            'user3,user4,1/1/2019 00:00:03', // fail
+            'user5,user6,1/1/2019 00:00:01', // not attempted
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();
@@ -254,11 +288,13 @@ class merge_file_testcase extends base {
         } catch (merge_exception $ex) {
             $this->assertEquals('STATUS_ERROR', $f->getStatus());
             $this->assertFailedFiles($path);
+            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
         }
     }
 
     /**
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function test_process_fail_error_from_merge_tool() {
         $this->resetAfterTest(true);
@@ -266,10 +302,10 @@ class merge_file_testcase extends base {
         $users = $this->create_users(range(1, 6));
 
         $path = $this->write_request_file("20190101-000000", [
-            'duplicateid,mergetoid,dateofmerge,full_name,email',
-            'user1,user2,1/1/2019 00:00:01,,', // ok
-            'user3,user4,1/1/2019 00:00:02,,', // will fail this
-            'user5,user6,1/1/2019 00:00:03,,', // should not be attempted
+            'duplicateid,mergetoid,dateofmerge',
+            'user1,user2,1/1/2019 00:00:01', // ok
+            'user3,user4,1/1/2019 00:00:02', // will fail this
+            'user5,user6,1/1/2019 00:00:03', // should not be attempted
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();
@@ -294,28 +330,32 @@ class merge_file_testcase extends base {
         } catch (merge_exception $ex) {
             $this->assertEquals('STATUS_FAILED', $f->getStatus());
             $this->assertFailedFiles($path);
+            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
         }
 
     }
 
+    /**
+     * @return array
+     */
     public function header_order_dataset() {
         return [
             [
                 [
-                    'duplicateid,mergetoid,dateofmerge,full_name,email',
-                    'user1,user2,1/1/2019 00:00:01,,'
+                    'duplicateid,mergetoid,dateofmerge',
+                    'user1,user2,1/1/2019 00:00:01'
                 ]
             ],
             [
                 [
-                    'mergetoid,duplicateid,dateofmerge,full_name,email',
-                    'user2,user1,1/1/2019 00:00:01,,'
+                    'mergetoid,duplicateid,dateofmerge',
+                    'user2,user1,1/1/2019 00:00:01'
                 ]
             ],
             [
                 [
-                    'dateofmerge,full_name,email,mergetoid,duplicateid',
-                    '1/1/2019 00:00:01,,,user2,user1'
+                    'dateofmerge,mergetoid,duplicateid',
+                    '1/1/2019 00:00:01,user2,user1'
                 ]
             ],
 
@@ -327,6 +367,7 @@ class merge_file_testcase extends base {
      * @dataProvider header_order_dataset
      * @param $data
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function test_header_order($data) {
         $this->resetAfterTest(true);
@@ -344,7 +385,7 @@ class merge_file_testcase extends base {
         $f = new merge_file($path);
         $f->process();
         $this->assertSuccessFiles($path);
+        $this->assert_log_file_contents($this->get_completed_log_path($path), $f);
+
     }
-
-
 }

@@ -5,7 +5,6 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . "/base.php");
 
-use core\task\manager as task_manager;
 use local_imisusermerge\imisusermerge;
 use local_imisusermerge\task\cron_task;
 use local_imisusermerge\task\merge_task;
@@ -17,7 +16,8 @@ use local_imisusermerge\task\merge_task;
 class cron_task_testcase extends base {
 
     /**
-     *
+     * @throws \coding_exception
+     * @throws \local_imisusermerge\merge_exception
      */
     public function setUp() {
         parent::setup();
@@ -47,6 +47,7 @@ class cron_task_testcase extends base {
     /**
      * @throws \coding_exception
      * @throws \dml_exception
+     * @throws \local_imisusermerge\merge_exception
      */
     public function test_cron_no_task() {
         $this->resetAfterTest(true);

@@ -26,8 +26,13 @@
 namespace local_imisusermerge\task;
 
 use local_imisusermerge\imisusermerge;
+use local_imisusermerge\merge_exception;
 use core\task\manager as task_manager;
 
+/**
+ * Class cron_task
+ * @package local_imisusermerge\task
+ */
 class cron_task extends \core\task\scheduled_task {
 
     /**
@@ -40,6 +45,10 @@ class cron_task extends \core\task\scheduled_task {
         return get_string('crontask', 'local_imisusermerge');
     }
 
+    /**
+     * @return array
+     * @throws \dml_exception
+     */
     public function get_merge_tasks() {
         global $DB;
         $comp = imisusermerge::COMPONENT_NAME;
@@ -51,12 +60,11 @@ class cron_task extends \core\task\scheduled_task {
     }
 
     /**
+     * @throws merge_exception
      * @throws \coding_exception
+     * @throws merge_exception
      */
     public function execute() {
-        global $DB;
-
-        $delay_threshold = 60*4; // 3 failures
 
         try {
             $tasks = $this->get_merge_tasks();

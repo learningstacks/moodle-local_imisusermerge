@@ -21,15 +21,51 @@ defined('MOODLE_INTERNAL') || die();
  * Class service_proxy
  * Interface to IMIS Bridge services
  * @package local_imisbridge
+ * @property-read config $config
+ * @property-read string $filepath
+ * @property-read string[] $lines
+ * @property-read string[] $headers
+ * @property-read string[] $missing_fields
+ * @property-read array $fldpos_map
+ * @property-read merge_action[][] $merges
+ * @property-read string $status
+ * @property-read string $message
+ * @property-read array $ambiguous_merges
+ * @property-read int $failed
+ * @property-read int $skipped
+ * @property-read int $completed
+ * @property-read int $current_line_num
+ * @property-read string $current_line
  */
-class merge_file {
+class merge_file implements \JsonSerializable {
 
+    /**
+     *
+     */
     const STATUS_TODO = 'STATUS_TODO';
+    /**
+     *
+     */
     const STATUS_LOADED = 'STATUS_LOADED';
+    /**
+     *
+     */
     const STATUS_COMPLETE = 'STATUS_COMPLETE';
+    /**
+     *
+     */
     const STATUS_FAILED = 'STATUS_FAILED';
+    /**
+     *
+     */
     const STATUS_INVALID_FILE = 'STATUS_INVALID_FILE';
+    /**
+     *
+     */
     const STATUS_EMPTY_FILE = 'STATUS_EMPTY_FILE';
+    /**
+     *
+     */
     const STATUS_ERROR = 'STATUS_ERROR';
 
     /**
@@ -68,6 +104,8 @@ class merge_file {
      * @var string
      */
     private $message;
+    /** @var @var array */
+    private $ambiguous_merges;
 
     /**
      * @var
@@ -95,6 +133,7 @@ class merge_file {
      * imisusermerge constructor.
      * @param $filepath
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function __construct($filepath) {
 
@@ -104,7 +143,8 @@ class merge_file {
 
         if (!file_exists($this->filepath)) {
             $this->status = self::STATUS_INVALID_FILE;
-            throw new merge_exception('no_file');
+            $this->message = get_string('no_file', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+            throw new merge_exception('invalid_file', $this->message);
         }
 
 
@@ -113,6 +153,7 @@ class merge_file {
     /**
      * @return merge_file|null
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public static function get_next_file() {
         $firstfile = null;
@@ -138,20 +179,22 @@ class merge_file {
      *
      * @param $line
      * @throws merge_exception
+     * @throws \coding_exception
      */
     protected function parse_header($line) {
         $map = $this->config->file_field_map;
         $this->fldpos_map = [];
         $this->headers = str_getcsv(strtolower(trim($line)));
-        $this->missing_fields = array_diff(array_keys($map), $this->headers);
+        $this->missing_fields = array_diff(array_values($map), $this->headers);
 
         if (!empty($this->missing_fields)) {
             $this->status = self::STATUS_INVALID_FILE;
-            throw new merge_exception('file_missing_fields', $this->as_string_params());
+            $this->message = get_string('file_missing_fields', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+            throw new merge_exception('invalid_file', $this->message);
         }
 
-        foreach ($map as $inname => $outname) {
-            $this->fldpos_map[$map[$inname]] = array_search($inname, $this->headers);
+        foreach ($map as $outname => $inname) {
+            $this->fldpos_map[$outname] = array_search($inname, $this->headers);
         }
     }
 
@@ -159,6 +202,7 @@ class merge_file {
     /**
      * @return int
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function load() {
 
@@ -166,23 +210,26 @@ class merge_file {
 
             if (!file_exists($this->filepath)) {
                 $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception("no_file", $this->as_string_params());
+                $this->message = get_string('no_file', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+                throw new merge_exception('invalid_file', $this->message);
             }
 
             // Load entire file into array so we ensure we process each line
-            $this->lines = file($this->filepath, FILE_IGNORE_NEW_LINES);
+            $this->lines = file($this->filepath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             if ($this->lines === false) {
                 $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception("read_failed", $this->as_string_params());
+                $this->message = get_string('read_failed', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+                throw new merge_exception('invalid_file', $this->message);
             }
 
             if (count($this->lines) < 2) {
                 $this->status = self::STATUS_EMPTY_FILE;
-                throw new merge_exception("empty_file", $this->as_string_params());
+                $this->message = get_string('empty_file', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+                throw new merge_exception('invalid_file', $this->message);
             }
 
             $from = [];
-            $dups = [];
+            $this->ambiguous_merges = [];
 
             $this->parse_header($this->lines[0]);
 
@@ -204,8 +251,8 @@ class merge_file {
 
                     // See if this user is being merged more than once
                     if (array_key_exists($from_imisid, $from)) {
-                        if (!array_key_exists($from_imisid, $dups)) {
-                            $dups[$from_imisid] = true;
+                        if (!array_key_exists($from_imisid, $this->ambiguous_merges)) {
+                            $this->ambiguous_merges[$from_imisid] = true;
                         }
                     } else {
                         $from[$from_imisid] = true;
@@ -214,12 +261,13 @@ class merge_file {
             }
 
             // Check for ambiguous merges
-            if (!empty($dups)) {
+            if (!empty($this->ambiguous_merges)) {
                 $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception('ambiguous_merges', $this->as_string_params());
+                $this->message = get_string('ambiguous_merges', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+                throw new merge_exception('invalid_file', $this->message);
             }
 
-            // Sert by mergetime to ensure we process in the same order as originally merged
+            // Sort by mergetime to ensure we process in the same order as originally merged
             $success = usort($this->merges, function (merge_action $m1, merge_action $m2) {
                 if ($m1->getMergeTime() < $m2->getMergeTime()) {
                     return -1;
@@ -231,8 +279,9 @@ class merge_file {
             });
 
             if (!$success) {
-                $this->status = self::STATUS_INVALID_FILE;
-                throw new merge_exception('sort_failed', $this->as_string_params());
+                $this->status = self::STATUS_ERROR;
+                $this->message = get_string('sort_failed', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+                throw new merge_exception('error', $this->message);
             }
 
             $this->status = self::STATUS_LOADED;
@@ -243,8 +292,9 @@ class merge_file {
 
         } catch (\Exception $ex) {
             $this->status = self::STATUS_ERROR;
-            $this->message = $ex->getMessage();
-            throw new merge_exception('error_encountered', $this->as_string_params());
+            $this->message = get_string('sort_failed', imisusermerge::COMPONENT_NAME, $this->as_string_params())
+                . "\n\n" . $ex->getMessage();
+            throw new merge_exception('error', $this->message);
         }
 
         return $this->status;
@@ -255,6 +305,7 @@ class merge_file {
      *
      * @return void
      * @throws merge_exception
+     * @throws \coding_exception
      */
     public function process() {
         $this->failed = 0;
@@ -271,6 +322,7 @@ class merge_file {
             foreach ($this->merges as $merge) {
                 try {
                     $merge->merge(); // Succeeds or throws
+                    $this->completed++;
 
                 } catch (merge_exception $ex) {
                     switch ($merge->getStatus()) {
@@ -314,9 +366,11 @@ class merge_file {
 
         } catch (\Exception $ex) {
             $this->status = self::STATUS_ERROR;
-            $this->message = $ex->getMessage();
             $this->log_failure();
-            throw new merge_exception('error_encountered', $this->as_string_params());
+            $this->status = self::STATUS_ERROR;
+            $this->message = get_string('sort_failed', imisusermerge::COMPONENT_NAME, $this->as_string_params())
+                . "\n\n" . $ex->getMessage();
+            throw new merge_exception('error', $this->message);
         }
     }
 
@@ -328,9 +382,8 @@ class merge_file {
         $completed_log_path = $this->get_completed_log_path();
         $failed_log_path = $this->get_failed_log_path();
 
-        // TODO: file with same name, other failure
         rename($this->filepath, $completed_file_path);
-        $this->write_log($completed_log_path);
+        $this->write_log($completed_log_path, $this->get_data_to_log());
         if (is_file($failed_log_path)) {
             unlink($failed_log_path);
         }
@@ -340,23 +393,46 @@ class merge_file {
      *
      */
     protected function log_failure() {
-        $this->write_log($this->get_failed_log_path());
+        $this->write_log($this->get_failed_log_path(), $this->get_data_to_log());
     }
 
-    protected function write_log($path) {
-        $handle = null;
+    /**
+     * @return array|mixed
+     */
+    protected function get_data_to_log() {
+        return $this->jsonSerialize();
+//        $data = new \stdClass();
+//        $map = [];
+//        $data->summary = $this;
+//
+//        $data->merges = [
+//
+//        ];
+//        foreach($this->config->file_field_map as $var_name => $file_field) {
+//            $map[$file_field] = $var_name;
+//        }
+//        $map['status'] = 'status';
+//        $map['message'] = 'message';
+//
+//        $data->merges[] = array_values($map);
+//
+//        foreach($this->merges as $merge) {
+//            $line_fields = [];
+//            foreach ($map as $file_name => $var_name) {
+//                $line_fields[] = $merge->$var_name;
+//            }
+//            $data->merges[] = $line_fields;
+//        }
+//
+//        return $data;
+    }
 
-        try {
-            $handle = fopen($path, "w");
-
-        } catch (\Exception $ex) {
-            // TODO: Write the file
-        } finally {
-            if ($handle) {
-                fclose($handle);
-            }
-        }
-
+    /**
+     * @param $path
+     * @param $data
+     */
+    public function write_log($path, $data) {
+        file_put_contents($path, json_encode($data));
     }
 
     /**
@@ -364,24 +440,33 @@ class merge_file {
      */
     public function as_string_params() {
         $vars = get_object_vars($this);
-        return (object) (array_filter($vars, function ($val) {
+        return (object)(array_filter($vars, function ($val) {
             return !is_array($val) && !is_object($val);
         }));
     }
 
+    /**
+     * @return string
+     */
     public function get_completed_file_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
         return "{$this->config->completed_dir}/{$filename}.csv";
     }
 
+    /**
+     * @return string
+     */
     public function get_completed_log_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->config->completed_dir}/{$filename}_log.csv";
+        return "{$this->config->completed_dir}/{$filename}_log.json";
     }
 
+    /**
+     * @return string
+     */
     public function get_failed_log_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->config->in_dir}/{$filename}_log.csv";
+        return "{$this->config->in_dir}/{$filename}_log.json";
     }
 
     /**
@@ -424,6 +509,27 @@ class merge_file {
      */
     public function getMessage() {
         return $this->message;
+    }
+
+    /**
+     * @return array|mixed
+     */
+    public function jsonSerialize() {
+        $vars = get_object_vars($this);
+        return $vars;
+    }
+
+    /**
+     * @param $name
+     * @return mixed
+     * @throws \coding_exception
+     */
+    public function __get($name) {
+        if (property_exists(self::class, $name)) {
+            return $this->$name;
+        } else {
+            throw new \coding_exception("Attempt to access invalid config property $name");
+        }
     }
 
 }

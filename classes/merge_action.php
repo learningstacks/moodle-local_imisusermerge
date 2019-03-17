@@ -13,8 +13,15 @@ require_once(__DIR__ . "/../../../admin/tool/mergeusers/lib/mergeusertool.php");
 /**
  * Class merge_action
  * @package local_imisusermerge
+ *  * @property-read string $file_base
+ * @property-read string $from_imisid The imisid of the user to be merged
+ * @property-read string $to_imisid
+ * @property-read string $merge_time
+ * @property-read string $status
+ * @property-read string $message
+ * @property-read string $line
  */
-class merge_action {
+class merge_action implements \JsonSerializable {
 
     /**
      * @var string
@@ -30,14 +37,6 @@ class merge_action {
     private $merge_time;
     /**
      * @var string
-     */
-    private $full_name;
-    /**
-     * @var string
-     */
-    private $email;
-    /**
-     * @var int
      */
     private $status;
     /**
@@ -60,13 +59,34 @@ class merge_action {
      * @var
      */
     private $to_user;
+    /**
+     * @var
+     */
     private $merge_tool_message;
 
+    /**
+     *
+     */
     const STATUS_TODO = 'STATUS_TODO';
+    /**
+     *
+     */
     const STATUS_MERGED = 'STATUS_MERGED';
+    /**
+     *
+     */
     const STATUS_SKIPPED = 'STATUS_SKIPPED';
+    /**
+     *
+     */
     const STATUS_FAILED = 'STATUS_FAILED';
+    /**
+     *
+     */
     const STATUS_ERROR = 'STATUS_ERROR';
+    /**
+     *
+     */
     const STATUS_INVALID = 'STATUS_INVALID';
 
     /**
@@ -99,8 +119,6 @@ class merge_action {
             $this->from_imisid = trim($vals[$map['from_imisid']]);
             $this->to_imisid = trim($vals[$map['to_imisid']]);
             $this->merge_time = strtotime($vals[$map['merge_time']]);
-            $this->full_name = trim($vals[$map['full_name']]);
-            $this->email = trim($vals[$map['email']]);
 
             if (
                 empty($this->from_imisid) || empty($this->to_imisid) || $this->merge_time === false
@@ -119,12 +137,10 @@ class merge_action {
     }
 
     /**
-     * @throws \dml_exception
      * @throws merge_exception
+     * @throws \dml_exception
      */
     public function merge() {
-
-        global $DB;
 
         try {
             $from_imisid = $this->getFromImisid();
@@ -148,12 +164,8 @@ class merge_action {
                 throw new merge_exception('missing_user', $this->as_string_params());
             }
 
-            // See if the from user has previously been merged
-            $merged = $DB->record_exists('tool_mergeusers', [
-                'fromuserid' => $this->from_user->id,
-                'success' => 1
-            ]);
-            if ($merged) {
+            /** @noinspection PhpUndefinedFieldInspection */
+            if ($this->user_has_been_merged($this->from_user->id)) {
                 $this->status = self::STATUS_SKIPPED;
                 throw new merge_exception('already_merged', $this->as_string_params());
             }
@@ -173,7 +185,24 @@ class merge_action {
             $this->message = $ex->getMessage();
             throw $ex;
         }
+    }
 
+    /**
+     * @param $userid
+     * @return bool
+     * @throws merge_exception
+     */
+    protected function user_has_been_merged($userid) {
+        global $DB;
+
+        try {
+            return $DB->record_exists('tool_mergeusers', [
+                'fromuserid' => $userid,
+                'success' => 1
+            ]);
+        } catch (\dml_exception $ex) {
+            throw new merge_exception('error', $ex->getMessage());
+        }
     }
 
     /**
@@ -187,6 +216,18 @@ class merge_action {
         global $DB;
 
         return $DB->get_record("user", ['username' => $imisid, 'mnethostid' => 1], "id");
+    }
+    /**
+     * @param $name
+     * @return mixed
+     * @throws \coding_exception
+     */
+    public function __get($name) {
+        if (isset($this->$name)) {
+            return $this->$name;
+        } else {
+            throw new \coding_exception("Attempt to access invalid config property $name");
+        }
     }
 
     /**
@@ -211,21 +252,7 @@ class merge_action {
     }
 
     /**
-     * @return mixed
-     */
-    public function getFullname() {
-        return $this->full_name;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getEmail() {
-        return $this->email;
-    }
-
-    /**
-     * @return int
+     * @return string
      */
     public function getStatus() {
         return $this->status;
@@ -282,5 +309,14 @@ class merge_action {
             return !is_array($val) && !is_object($val);
         }));
     }
+
+    /**
+     * @return array|mixed
+     */
+    public function jsonSerialize() {
+        $vars = get_object_vars($this);
+        return $vars;
+    }
+
 
 }
