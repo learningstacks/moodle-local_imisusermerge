@@ -20,7 +20,7 @@ $tasks = array(
     array(
         'classname' => 'local_imisusermerge\task\cron_task',
         'blocking' => 0,
-        'minute' => '5',
+        'minute' => '*',
         'hour' => '*',
         'day' => '*',
         'month' => '*',

@@ -67,16 +67,21 @@ class cron_task extends \core\task\scheduled_task {
     public function execute() {
 
         try {
+            mtrace("Ensure merge ad-hoc tasks exists");
             $tasks = $this->get_merge_tasks();
 
             if (count($tasks) > 1) {
                 throw new \coding_exception("More than one merge_tasks exist");
 
             } else if (empty($tasks)) {
+                mtrace("Creating merge ad-hoc task");
                 task_manager::queue_adhoc_task(new merge_task());
+            } else {
+                mtrace("Merge ad-hoc tasks already exists");
             }
 
         } catch (\Exception $ex) {
+            mtrace($ex->getMessage());
             imisusermerge::send_notification(
                 get_string('failed_to_create_merge_task_email_subject', imisusermerge::COMPONENT_NAME),
                 get_string('failed_to_create_merge_task_email_body', imisusermerge::COMPONENT_NAME),

@@ -205,7 +205,9 @@ class merge_file implements \JsonSerializable {
      * @throws \coding_exception
      */
     public function load() {
-
+        $mbsub = ini_get('mbstring.substitute_character');
+        ini_set('mbstring.substitute_character', "none");
+     
         try {
 
             if (!file_exists($this->filepath)) {
@@ -230,12 +232,13 @@ class merge_file implements \JsonSerializable {
 
             $from = [];
             $this->ambiguous_merges = [];
+            $enc = mb_detect_encoding($this->lines[0]);
 
-            $this->parse_header($this->lines[0]);
+            $this->parse_header(mb_convert_encoding($this->lines[0], "ISO-8859-1",$enc));
 
             // Extract the merge_actions
             for ($linenum = 1; $linenum < count($this->lines); $linenum++) {
-                $this->current_line = $str = trim($this->lines[$linenum]);
+                $this->current_line = $str = mb_convert_encoding(trim($this->lines[$linenum]), "ISO-8859-1",$enc);
                 $this->current_line_num = $linenum;
                 if (!empty($str)) {
 
@@ -295,6 +298,8 @@ class merge_file implements \JsonSerializable {
             $this->message = get_string('sort_failed', imisusermerge::COMPONENT_NAME, $this->as_string_params())
                 . "\n\n" . $ex->getMessage();
             throw new merge_exception('error', $this->message);
+        } finally {
+            ini_set('mbstring.substitute_character', $mbsub);
         }
 
         return $this->status;

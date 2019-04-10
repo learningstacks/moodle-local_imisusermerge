@@ -40,6 +40,7 @@ class merge_task extends \core\task\adhoc_task {
 
         try {
             if ($filename = merge_file::get_next_file()) {
+                mtrace("Processing merge file $filename");
                 $this->path = "{$config->in_dir}/$filename";
                 $this->merge_file = new merge_file($this->path);
                 $this->merge_file->process();
@@ -55,6 +56,7 @@ class merge_task extends \core\task\adhoc_task {
                     ],
                     null
                 );
+                mtrace("Completed processing merge file $filename");
 
                 $next_task = new merge_task();
                 task_manager::queue_adhoc_task($next_task);
