@@ -112,34 +112,10 @@ abstract class base extends \advanced_testcase {
      * @return string
      */
     protected function write_request_file($datetime, $data = []) {
-        $path = "{$this->config->in_dir}/user_merge_request_{$datetime}.csv";
+        $path = "{$this->config->in_dir}/{$this->config->file_base}_{$datetime}.{$this->config->file_ext}";
         file_put_contents($path, join("\n", $data));
         return $path;
     }
-
-//    /**
-//     * @return \PHPUnit_Framework_MockObject_MockObject
-//     */
-//    protected function getMergeToolMock($expected_params = [], $returns = []) {
-//
-//        $mock = $this->getMockBuilder(MergeUserTool::class)
-//            ->setMethods([
-//                'merge'
-//            ])
-//            ->getMock();
-//
-//        if (empty($expected_params)) {
-//            $mock->expects($this->never())->method('merge');
-//
-//        } else {
-//            $mock->expects($this->exactly(count($expected_params)))
-//                ->method('merge')
-//                ->withConsecutive($expected_params)
-//                ->willReturnOnConsecutiveCalls($returns);
-//        };
-//
-//        return $mock;
-//    }
 
     /**
      * @return \PHPUnit_Framework_MockObject_MockObject
@@ -161,7 +137,7 @@ abstract class base extends \advanced_testcase {
      */
     protected function get_completed_file_path($path) {
         $filename = pathinfo($path, PATHINFO_FILENAME);
-        return "{$this->config->completed_dir}/{$filename}.csv";
+        return "{$this->config->completed_dir}/{$filename}.{$this->config->file_ext}";
     }
 
     /**

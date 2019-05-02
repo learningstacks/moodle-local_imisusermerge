@@ -13,6 +13,7 @@ defined('MOODLE_INTERNAL') || die();
  * Class config
  * @package local_imisusermerge
  * @property-read string $file_base
+ * @property-read string $file_ext
  * @property-read string $in_dir the full path to the in_dir
  * @property-read string $completed_dir
  * @property-read string $file_name_regex
@@ -25,6 +26,10 @@ class config extends imisusermerge implements \JsonSerializable {
      * @var
      */
     private $file_base;
+    /**
+     * @var
+     */
+    private $file_ext;
     /**
      * @var
      */
@@ -55,9 +60,10 @@ class config extends imisusermerge implements \JsonSerializable {
         global $CFG;
 
         // hard-coded settings
-        $this->file_base = 'user_merge_request_';
+        $this->file_base = 'user_merge_request';
+        $this->file_ext = "txt";
         $this->notification_email_addresses = [];
-        $this->file_name_regex = "/^{$this->file_base}[0-9]{8}-[0-9]{6}\.csv$/i";
+        $this->file_name_regex = "/^{$this->file_base}_[0-9]{8}(-[0-9]{6})?\.(txt|csv)$/i";
         $this->file_field_map = [
             'from_imisid' => 'duplicateid',
             'to_imisid' => 'mergetoid',
@@ -103,33 +109,6 @@ class config extends imisusermerge implements \JsonSerializable {
         } else {
             $this->completed_dir = $CFG->merge_completed_dir;
         }
-
-//        // merge_file_name_regex
-//        if (empty($CFG->merge_file_name_regex)) {
-//            $errors[] = $this->get_string("invalid_merge_file_name_regex","not set");
-//        } else {
-//            $this->file_name_regex = $CFG->merge_file_name_regex;
-//        }
-//
-//        // merge_file_field_map
-//        if (empty($CFG->merge_file_field_map)) {
-//            $errors[] = "merge_file_field_map is not set";
-//        } else if (!is_array($CFG->merge_file_field_map)) {
-//            $errors[] = "merge_file_field_map is not an array";
-//        } else {
-//            $required_fields = ['from_imisid', 'to_imisid', 'merge_time'];
-//            $missing_fields = [];
-//            foreach ($required_fields as $fld) {
-//                if (!array_key_exists($fld, $CFG->merge_file_field_map) || empty($CFG->merge_file_field_map[$fld])) {
-//                    $missing_fields[] = $fld;
-//                }
-//            }
-//            if (!empty($missing_fields)) {
-//                $errors[] = "Missing merge_file_field_map entries: " . join(', ', $missing_fields);
-//            } else {
-//                $this->file_field_map = $CFG->merge_file_field_map;
-//            }
-//        }
 
         if (!empty($errors)) {
             throw new merge_exception('invalid_config', join("\n", $errors));

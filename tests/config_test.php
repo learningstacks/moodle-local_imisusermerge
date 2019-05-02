@@ -54,7 +54,6 @@ class config_testcase extends base {
         $config = new config();
         $this->assertEquals("{$this->base_dir}/todo", $config->in_dir);
         $this->assertEquals("{$this->base_dir}/completed", $config->completed_dir);
-        $this->assertEquals("/^{$this->config->file_base}[0-9]{8}-[0-9]{6}\.csv$/i", $config->file_name_regex);
         $this->assertEquals('duplicateid', $config->file_field_map['from_imisid']);
         $this->assertEquals('mergetoid', $config->file_field_map['to_imisid']);
         $this->assertEquals('dateofmerge', $config->file_field_map['merge_time']);

@@ -69,17 +69,31 @@ class merge_file_testcase extends base {
      * @throws merge_exception
      * @throws \coding_exception
      */
-    public function test_get_next_file_multiple_files() {
+    public function test_get_next_file_sorting() {
         $this->resetAfterTest(true);
 
-        for ($num = 3; $num >= 1; $num--) {
-            touch("{$this->config->in_dir}/user_merge_request_20190101-00000{$num}.csv");
+        $filenames = [
+            "{$this->config->file_base}_20190115.txt",
+            "{$this->config->file_base}_20190114.csv",
+            "{$this->config->file_base}_20190113-100001.txt",
+            "{$this->config->file_base}_20190113-100000.csv",
+        ];
+
+        // Create files
+        foreach ($filenames as $filename) {
+            touch("{$this->config->in_dir}/{$filename}");
         }
-        for ($num = 1; $num <= 3; $num++) {
-            $this->assertEquals("user_merge_request_20190101-00000{$num}.csv", merge_file::get_next_file());
-            unlink("{$this->config->in_dir}/user_merge_request_20190101-00000{$num}.csv");
+
+        // Verify accessed in sorted order
+        $filenames_sorted = $filenames;
+        $this->assertTrue(sort($filenames_sorted), "sort the filenames");
+        $this->assertTrue($filenames_sorted !== $filenames, "filenames were actually sorted");
+        foreach ($filenames_sorted as $filename) {
+            $this->assertEquals($filename, merge_file::get_next_file());
+            unlink("{$this->config->in_dir}/{$filename}");
         }
     }
+
 
     /**
      *

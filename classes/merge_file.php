@@ -156,21 +156,23 @@ class merge_file implements \JsonSerializable {
      * @throws \coding_exception
      */
     public static function get_next_file() {
-        $firstfile = null;
-
         /* @var config */
         $config = imisusermerge::get_config();
         $regex = $config->file_name_regex;
+        $filenames = [];
 
         foreach (scandir($config->in_dir) as $filename) {
             if (preg_match($regex, $filename)) {
-                if ($firstfile === null || strcmp(strtolower($filename), strtolower($firstfile)) < 0) {
-                    $firstfile = $filename;
-                }
+                $filenames[] = $filename;
             }
         }
 
-        return $firstfile;
+        $fn = function($a, $b) {
+            return strcmp(pathinfo($a, PATHINFO_FILENAME), pathinfo($b, PATHINFO_FILENAME));
+        };
+
+        usort($filenames, $fn);
+        return ($filenames) ? $filenames[0] : null;
     }
 
 
@@ -266,7 +268,7 @@ class merge_file implements \JsonSerializable {
             // Check for ambiguous merges
             if (!empty($this->ambiguous_merges)) {
                 $this->status = self::STATUS_INVALID_FILE;
-                $this->message = get_string('ambiguous_merges', imisusermerge::COMPONENT_NAME, $this->as_string_params());
+                $this->message = get_string('ambiguous_merges', imisusermerge::COMPONENT_NAME, implode(", ", $this->as_string_params()));
                 throw new merge_exception('invalid_file', $this->message);
             }
 
@@ -455,7 +457,7 @@ class merge_file implements \JsonSerializable {
      */
     public function get_completed_file_path() {
         $filename = pathinfo($this->filepath, PATHINFO_FILENAME);
-        return "{$this->config->completed_dir}/{$filename}.csv";
+        return "{$this->config->completed_dir}/{$filename}.{$this->config->file_ext}";
     }
 
     /**
