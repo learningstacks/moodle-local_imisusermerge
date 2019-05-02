@@ -234,13 +234,11 @@ class merge_file implements \JsonSerializable {
 
             $from = [];
             $this->ambiguous_merges = [];
-            $enc = mb_detect_encoding($this->lines[0]);
-
-            $this->parse_header(mb_convert_encoding($this->lines[0], "ISO-8859-1",$enc));
+            $this->parse_header($this->lines[0]);
 
             // Extract the merge_actions
             for ($linenum = 1; $linenum < count($this->lines); $linenum++) {
-                $this->current_line = $str = mb_convert_encoding(trim($this->lines[$linenum]), "ISO-8859-1",$enc);
+                $this->current_line = $str = $this->lines[$linenum];
                 $this->current_line_num = $linenum;
                 if (!empty($str)) {
 
@@ -448,7 +446,7 @@ class merge_file implements \JsonSerializable {
     public function as_string_params() {
         $vars = get_object_vars($this);
         return (object)(array_filter($vars, function ($val) {
-            return !is_array($val) && !is_object($val);
+            return (!is_array($val) && !is_object($val));
         }));
     }
 
