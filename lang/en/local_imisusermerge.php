@@ -62,5 +62,5 @@ $string['file_missing_fields'] = 'File is missing required fields';
 
 $string['no_file'] = 'File {$a->filepath} does not exist';
 $string['empty_file'] = 'File {$a->filepath} contains no data';
-$string['sort_failed'] = 'Sorting file contents by merge data time failed';
+$string['sort_failed'] = 'Sorting file contents by merge datetime failed';
 $string['ambiguous_merges'] = 'The file requests the following IMIS ids to be merged to more than one destination {$a}';
