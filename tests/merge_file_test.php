@@ -94,6 +94,20 @@ class merge_file_testcase extends base {
         }
     }
 
+    public function test_load_datetime_patterns() {
+        $this->resetAfterTest(true);
+
+        $path = $this->write_request_file("20190101-000000", [
+            'duplicateid,mergetoid,dateofmerge',
+            'a1,b1,1/1/2019 00:00:00',
+            'a2,b2,1/1/2019 00:00:00.0000',
+            'a3,b3,2019-01-01 00:00:00',
+            'a4,b4,2019-01-01 00:00:00.970000000',
+        ]);
+        $f = new merge_file($path);
+        $this->assertEquals(merge_file::STATUS_LOADED, $f->load());
+
+    }
 
     /**
      *
@@ -224,7 +238,7 @@ class merge_file_testcase extends base {
                 [
                     'duplicateid,mergetoid,dateofmerge',
                     'user1,user2,1/1/2019 00:00:01', // Should work
-                    'user2,user5,1/1/2019 00:00:02', // Missing to, hould cause error
+                    'user2,user5,1/1/2019 00:00:02', // Missing to, should cause error
                     'user3,user4,1/1/2019 00:00:03', // Should not be attempted
                 ],
                 [

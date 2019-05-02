@@ -118,7 +118,7 @@ class merge_action implements \JsonSerializable {
 
             $this->from_imisid = trim($vals[$map['from_imisid']]);
             $this->to_imisid = trim($vals[$map['to_imisid']]);
-            $this->merge_time = strtotime($vals[$map['merge_time']]);
+            $this->merge_time = strtotime(substr($vals[$map['merge_time']], 0, 23));
 
             if (
                 empty($this->from_imisid) || empty($this->to_imisid) || $this->merge_time === false
