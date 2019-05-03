@@ -9,6 +9,7 @@
 namespace local_imisusermerge;
 
 require_once(__DIR__ . "/../../../admin/tool/mergeusers/lib/mergeusertool.php");
+require_once(__DIR__ . "/../../../user/lib.php");
 
 /**
  * Class merge_action
@@ -72,6 +73,7 @@ class merge_action implements \JsonSerializable {
      *
      */
     const STATUS_MERGED = 'STATUS_MERGED';
+    const STATUS_UPDATED = 'STATUS_UPDATED';
     /**
      *
      */
@@ -142,6 +144,8 @@ class merge_action implements \JsonSerializable {
      */
     public function merge() {
 
+        global $DB;
+
         try {
             $from_imisid = $this->getFromImisid();
             $to_imisid = $this->getToImisid();
@@ -151,17 +155,12 @@ class merge_action implements \JsonSerializable {
                 throw new merge_exception('same_user', $this->as_string_params());
             }
 
-            $missing = [];
-            if (($this->from_user = $this->get_user_by_imisid($from_imisid)) === false) {
-                $missing[] = $from_imisid;
-            }
-            if (($this->to_user = $this->get_user_by_imisid($to_imisid)) === false) {
-                $missing[] = $to_imisid;
-            }
+            $this->from_user = $this->get_user_by_imisid($from_imisid);
+            $this->to_user = $this->get_user_by_imisid($to_imisid);
 
-            if (!empty($missing)) {
+            if (!$this->from_user) {
                 $this->status = self::STATUS_ERROR;
-                throw new merge_exception('missing_user', $this->as_string_params());
+                throw new merge_exception('missing_from_user', $from_imisid);
             }
 
             /** @noinspection PhpUndefinedFieldInspection */
@@ -170,16 +169,37 @@ class merge_action implements \JsonSerializable {
                 throw new merge_exception('already_merged', $this->as_string_params());
             }
 
-            // Do the merge
-            $result = imisusermerge::get_merge_tool()->merge((int)$this->to_user->id, (int)$this->from_user->id);
-            list($success, $log) = $result;
-            if ($success) {
-                $this->status = self::STATUS_MERGED;
+            if ($this->to_user) {
+                // Do the merge
+                $result = imisusermerge::get_merge_tool()->merge((int)$this->to_user->id, (int)$this->from_user->id);
+                list($success, $log) = $result;
+                if ($success) {
+                    $this->status = self::STATUS_MERGED;
+                } else {
+                    $this->status = self::STATUS_FAILED;
+                    $this->merge_tool_message = join("\n", (array)$log);
+                    throw new merge_exception('merge_tool_failed', $this->as_string_params());
+                }
             } else {
-                $this->status = self::STATUS_FAILED;
-                $this->merge_tool_message = join("\n", (array)$log);
-                throw new merge_exception('merge_tool_failed', $this->as_string_params());
+                $mods = (object)[
+                    "id" => $this->from_user->id,
+                    "username" => $to_imisid,
+                    "idnumber" => $to_imisid
+                ];
+                try {
+                    user_update_user($mods, false, true);
+                    $this->status = self::STATUS_UPDATED;
+                } catch (\Exception $ex) {
+                    $this->status = self::STATUS_FAILED;
+                    $args = [
+                        'from_imisid' => $this->from_imisid,
+                        'to_imisid' => $this->to_imisid,
+                        'message' => $ex->getMessage()
+                    ];
+                    throw new merge_exception('user_update_failed', $args);
+                }
             }
+
 
         } catch (merge_exception $ex) {
             $this->message = $ex->getMessage();
@@ -217,6 +237,7 @@ class merge_action implements \JsonSerializable {
 
         return $DB->get_record("user", ['username' => $imisid, 'mnethostid' => 1], "id");
     }
+
     /**
      * @param $name
      * @return mixed
@@ -305,7 +326,7 @@ class merge_action implements \JsonSerializable {
      */
     public function as_string_params() {
         $vars = get_object_vars($this);
-        return (object) (array_filter($vars, function ($val) {
+        return (object)(array_filter($vars, function ($val) {
             return !is_array($val) && !is_object($val);
         }));
     }

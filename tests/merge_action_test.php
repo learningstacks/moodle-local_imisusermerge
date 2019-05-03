@@ -108,8 +108,7 @@ class merge_action_testcase extends base {
      */
     public function merge_missing_users_dataset() {
         return [
-            'missing from' => ['exists,missing,1/1/2019', merge_action::STATUS_ERROR],
-            'missing to' => ['missing,exists,1/1/2019', merge_action::STATUS_ERROR],
+            'missing from' => ['missing,exists,1/1/2019', merge_action::STATUS_ERROR],
             'missing both' => ['missing1,missing2,1/1/2019', merge_action::STATUS_ERROR],
         ];
     }
@@ -121,7 +120,7 @@ class merge_action_testcase extends base {
      * @throws merge_exception
      * @throws \dml_exception
      */
-    public function test_merge_missing_users($line, $expected_status) {
+    public function test_merge_missing_from_user($line, $expected_status) {
         $this->resetAfterTest(true);
 
         $this->getDataGenerator()->create_user(['username' => 'exists']);
@@ -138,6 +137,43 @@ class merge_action_testcase extends base {
         } catch (merge_exception $ex) {
             $this->assertEquals($expected_status, $m->getStatus());
         }
+
+    }
+
+    public function test_merge_missing_to_user() {
+        global $DB;
+        $this->resetAfterTest(true);
+
+        $user = $this->getDataGenerator()->create_user(['username' => 'current', 'idnumber' => 'current']);
+
+        $m = new merge_action(1, 'current,new,1/1/2019', $this->map);
+        $merge_tool_mock = $this->getMergeToolMock();
+        $merge_tool_mock->expects($this->never())->method('merge');
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
+
+        $m->merge();
+        $this->assertEquals('STATUS_UPDATED', $m->status);
+        $this->assertTrue(
+            $DB->record_exists(
+                'user',
+                [
+                    'id' => $user->id,
+                    'username' => 'new',
+                    'idnumber' => 'new'
+                ]
+            )
+        );
+        $this->assertFalse(
+            $DB->record_exists(
+                'user',
+                [
+                    'id' => $user->id,
+                    'username' => 'current',
+                    'idnumber' => 'current'
+                ]
+            )
+        );
+
 
     }
 

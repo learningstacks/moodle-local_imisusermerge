@@ -94,6 +94,10 @@ class merge_file_testcase extends base {
         }
     }
 
+    /**
+     * @throws \coding_exception
+     * @throws merge_exception
+     */
     public function test_load_datetime_patterns() {
         $this->resetAfterTest(true);
 
@@ -108,6 +112,37 @@ class merge_file_testcase extends base {
         $this->assertEquals(merge_file::STATUS_LOADED, $f->load());
 
     }
+
+    /**
+     * @return array
+     */
+    public function empty_file_dataset() {
+        return [
+            [
+                [] // No data
+            ],
+            [
+                ['duplicateid,mergetoid,dateofmerge'] // headers only
+            ]
+        ];
+    }
+
+    /**
+     * @dataProvider empty_file_dataset
+     * @param $data
+     * @throws \coding_exception
+     * @throws merge_exception
+     */
+    public function test_process_empty_file($data) {
+        $this->resetAfterTest(true);
+
+        $path = $this->write_request_file("20190101-000000", $data);
+        $f = new merge_file($path);
+        $f->process();
+        $this->assertEquals(merge_file::STATUS_EMPTY_FILE, $f->status);
+        $this->assertSuccessFiles($path);
+    }
+
 
     /**
      *
@@ -149,7 +184,7 @@ class merge_file_testcase extends base {
         $path = $this->write_request_file("20190101-000000", [
             'duplicateid,mergetoid,dateofmerge',
             'a,a1,1/1/2019,',
-            'a,a1,1/1/2019,a' // missing email
+            'a,a1,1/1/2019,a' // extra element
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();
@@ -217,51 +252,24 @@ class merge_file_testcase extends base {
     }
 
     /**
-     * @return array
-     */
-    public function missing_user_dataset() {
-        return [
-            [
-                [
-                    'duplicateid,mergetoid,dateofmerge',
-                    'user1,user2,1/1/2019 00:00:01', // Should work
-                    'user5,user2,1/1/2019 00:00:02', // SMissing from, should cause error
-                    'user3,user4,1/1/2019 00:00:03', // Should not be attempted
-                ],
-                [
-                    'failed' => 1,
-                    'skipped' => 0,
-                    'completed' => 1
-                ]
-            ],
-            [
-                [
-                    'duplicateid,mergetoid,dateofmerge',
-                    'user1,user2,1/1/2019 00:00:01', // Should work
-                    'user2,user5,1/1/2019 00:00:02', // Missing to, should cause error
-                    'user3,user4,1/1/2019 00:00:03', // Should not be attempted
-                ],
-                [
-                    'failed' => 1,
-                    'skipped' => 0,
-                    'completed' => 1
-                ]
-            ]
-        ];
-    }
-
-    /**
-     * @dataProvider missing_user_dataset
      * @param $data
      * @throws merge_exception
      * @throws \coding_exception
      * @throws \coding_exception
      */
-    public function test_process_error_missing_user($data, $expected) {
+    public function test_process_error_missing_user() {
         $this->resetAfterTest(true);
         $users = $this->create_users(range(1, 4));
 
-        $path = $this->write_request_file("20190101-000000", $data);
+        $path = $this->write_request_file(
+            "20190101-000000",
+            [
+                'duplicateid,mergetoid,dateofmerge',
+                'user1,user2,1/1/2019 00:00:01', // Should work
+                'missing,user2,1/1/2019 00:00:02', // SMissing from, error
+                'user3,user4,1/1/2019 00:00:03', // Should not be attempted
+            ]
+        );
 
         $merge_tool_mock = $this->getMergeToolMock();
         $merge_tool_mock->expects($this->once())
@@ -277,14 +285,12 @@ class merge_file_testcase extends base {
             throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
 
         } catch (merge_exception $ex) {
-            $this->assertEquals($expected['failed'], $f->failed, 'failed count');
-            $this->assertEquals($expected['completed'], $f->completed, 'completed count');
-            $this->assertEquals($expected['skipped'], $f->skipped, 'skipped count');
-
-            $this->assertEquals('STATUS_ERROR', $f->getStatus());
+            $this->assertEquals(1, $f->failed, 'failed count');
+            $this->assertEquals(1, $f->completed, 'completed count');
+            $this->assertEquals(0, $f->skipped, 'skipped count');
+            $this->assertEquals('STATUS_ERROR', $f->status);
             $this->assertFailedFiles($path);
             $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
-
         }
     }
 
@@ -415,5 +421,39 @@ class merge_file_testcase extends base {
         $this->assertSuccessFiles($path);
         $this->assert_log_file_contents($this->get_completed_log_path($path), $f);
 
+    }
+
+    /**
+     * @throws \coding_exception
+     * @throws merge_exception
+     */
+    public function test_load_sample_file_from_iaff() {
+        $this->resetAfterTest(true);
+
+        $path = $this->write_request_file("20190101-000000", [
+            "DuplicateID,MergeToID,DateOfMerge",
+            "1258561,1311348,2015-02-02 09:56:28.960000000",
+            "1279860,1311348,2015-02-02 09:56:49.827000000",
+            "1324916,1318106,2016-03-08 12:10:08.463000000",
+            "1300843,1315331,2016-06-14 09:36:32.953000000",
+            "1343670,0479005,2017-01-10 10:18:26.597000000",
+            "1325678,1315331,2017-02-16 11:45:11.633000000",
+            "1259764,1374389,2017-07-05 13:39:59.243000000",
+            "1363688,1229960,2019-03-12 15:24:52.107000000",
+            "1346730,1263064,2019-03-12 15:29:46.730000000",
+            "1356361,1352468,2019-03-12 15:33:08.587000000",
+            "1353065,1147407,2019-03-12 15:38:20.490000000",
+            "1361048,1167977,2019-03-12 15:41:01.350000000",
+            "1360239,1052648,2019-03-13 13:53:06.857000000",
+            "1366205,1358037,2019-03-14 09:39:08.123000000",
+            "1358037,0513549,2019-03-14 09:39:47.650000000",
+            "1371143,1049491,2019-03-14 09:49:56.610000000",
+            "1335597,1020118,2019-03-19 15:20:13.700000000",
+            "1312053,1254211,2019-03-19 15:53:30.800000000",
+            "1303640,1178773,2019-03-19 15:56:08.733000000"
+        ]);
+
+        $f = new merge_file($path);
+        $this->assertEquals(merge_file::STATUS_LOADED, $f->load());
     }
 }

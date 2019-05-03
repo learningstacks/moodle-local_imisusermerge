@@ -209,6 +209,7 @@ class merge_file implements \JsonSerializable {
     public function load() {
         $mbsub = ini_get('mbstring.substitute_character');
         ini_set('mbstring.substitute_character', "none");
+        $this->merges = [];
      
         try {
 
@@ -228,8 +229,7 @@ class merge_file implements \JsonSerializable {
 
             if (count($this->lines) < 2) {
                 $this->status = self::STATUS_EMPTY_FILE;
-                $this->message = get_string('empty_file', imisusermerge::COMPONENT_NAME, $this->as_string_params());
-                throw new merge_exception('invalid_file', $this->message);
+                return $this->status;
             }
 
             $from = [];
@@ -350,6 +350,7 @@ class merge_file implements \JsonSerializable {
                             $this->skipped++;
                             break;
                         case merge_action::STATUS_MERGED:
+                        case merge_action::STATUS_UPDATED:
                             $this->completed++;
                             break;
                         default:
@@ -371,10 +372,8 @@ class merge_file implements \JsonSerializable {
 
         } catch (\Exception $ex) {
             $this->status = self::STATUS_ERROR;
+            $this->message = $ex->getMessage();
             $this->log_failure();
-            $this->status = self::STATUS_ERROR;
-            $this->message = get_string('sort_failed', imisusermerge::COMPONENT_NAME, $this->as_string_params())
-                . "\n\n" . $ex->getMessage();
             throw new merge_exception('error', $this->message);
         }
     }
@@ -406,30 +405,6 @@ class merge_file implements \JsonSerializable {
      */
     protected function get_data_to_log() {
         return $this->jsonSerialize();
-//        $data = new \stdClass();
-//        $map = [];
-//        $data->summary = $this;
-//
-//        $data->merges = [
-//
-//        ];
-//        foreach($this->config->file_field_map as $var_name => $file_field) {
-//            $map[$file_field] = $var_name;
-//        }
-//        $map['status'] = 'status';
-//        $map['message'] = 'message';
-//
-//        $data->merges[] = array_values($map);
-//
-//        foreach($this->merges as $merge) {
-//            $line_fields = [];
-//            foreach ($map as $file_name => $var_name) {
-//                $line_fields[] = $merge->$var_name;
-//            }
-//            $data->merges[] = $line_fields;
-//        }
-//
-//        return $data;
     }
 
     /**
