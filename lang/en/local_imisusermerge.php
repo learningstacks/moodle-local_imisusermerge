@@ -58,9 +58,10 @@ $string['email_send_failed'] = 'Failure occured attempting to send notification 
 {$a}';
 $string['missing_email_attachment'] = 'Failure occured attempting to send notification email: 
 {$a}';
-$string['file_missing_fields'] = 'File is missing required fields';
-
 $string['no_file'] = 'File {$a->filepath} does not exist';
-$string['empty_file'] = 'File {$a->filepath} contains no data';
-$string['sort_failed'] = 'Sorting file contents by merge datetime failed';
+$string['file_missing_fields'] = 'File is missing required fields';
+$string['missing_from_user'] = 'The duplicate user with imisid {$a} does not exist';
+$string['user_update_failed'] = 'error attempting to update the imisid of a user from {a->from_imisid} to {$a->to_imisid}. Receied error {$a->message}';
+$string["read_failed"] = 'Failed reading file {$a->file_path}. {$a->message}';
+$string['sort_failed'] = 'Sorting file contents by merge datetime failed: {$a->message}';
 $string['ambiguous_merges'] = 'The file requests the following IMIS ids to be merged to more than one destination {$a}';
