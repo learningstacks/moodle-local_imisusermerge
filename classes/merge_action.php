@@ -141,10 +141,9 @@ class merge_action implements \JsonSerializable {
     /**
      * @throws merge_exception
      * @throws \dml_exception
+     * @throws \coding_exception
      */
     public function merge() {
-
-        global $DB;
 
         try {
             $from_imisid = $this->getFromImisid();
@@ -152,21 +151,27 @@ class merge_action implements \JsonSerializable {
 
             if ($from_imisid == $to_imisid) {
                 $this->status = self::STATUS_SKIPPED;
-                throw new merge_exception('same_user', $this->as_string_params());
+                $this->message = get_string('same_user', imisusermerge::COMPONENT_NAME,  $this->as_string_params());
+                return;
+//                throw new merge_exception('same_user', $this->as_string_params());
             }
 
             $this->from_user = $this->get_user_by_imisid($from_imisid);
             $this->to_user = $this->get_user_by_imisid($to_imisid);
 
             if (!$this->from_user) {
-                $this->status = self::STATUS_ERROR;
-                throw new merge_exception('missing_from_user', $from_imisid);
+                $this->status = self::STATUS_SKIPPED;
+                $this->message = get_string('missing_from_user', imisusermerge::COMPONENT_NAME,  $from_imisid);
+                return;
+//                throw new merge_exception('missing_from_user', $from_imisid);
             }
 
             /** @noinspection PhpUndefinedFieldInspection */
             if ($this->user_has_been_merged($this->from_user->id)) {
                 $this->status = self::STATUS_SKIPPED;
-                throw new merge_exception('already_merged', $this->as_string_params());
+                $this->message = get_string('already_merged', imisusermerge::COMPONENT_NAME,  $from_imisid);
+                return;
+//                throw new merge_exception('already_merged', $this->as_string_params());
             }
 
             if ($this->to_user) {

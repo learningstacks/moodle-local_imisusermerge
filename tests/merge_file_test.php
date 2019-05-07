@@ -224,11 +224,12 @@ class merge_file_testcase extends base {
 
         $path = $this->write_request_file("20190101-000000", [
             'duplicateid,mergetoid,dateofmerge',
-            'user1,user2,1/1/2019 00:00:02',
+            'user1,user2,1/1/2019 00:00:02', //MERGED
             '',
-            'user5,user6,1/1/2019 00:00:03', // skip: already merged
-            'user3,user4,1/1/2019 00:00:01',
-            'user7,user7,1/1/2019 00:00:01', // skip: from = to
+            'user5,user6,1/1/2019 00:00:03', // SKIPPED
+            'missing,user6,1/1/2019 00:00:03', // SKIPPED
+            'user3,user4,1/1/2019 00:00:01', //MERGED
+            'user7,user7,1/1/2019 00:00:01', // SKIPPED
         ]);
 
         $merge_tool_mock = $this->getMergeToolMock();
@@ -246,91 +247,17 @@ class merge_file_testcase extends base {
 
         $this->assertEquals(0, $f->failed, 'failed count');
         $this->assertEquals(2, $f->completed, 'completed count');
-        $this->assertEquals(2, $f->skipped, 'skipped count');
+        $this->assertEquals(3, $f->skipped, 'skipped count');
         $this->assertSuccessFiles($path);
         $this->assert_log_file_contents($this->get_completed_log_path($path), $f);
     }
 
     /**
-     * @param $data
+     * @throws \coding_exception
      * @throws merge_exception
-     * @throws \coding_exception
-     * @throws \coding_exception
      */
-    public function test_process_error_missing_user() {
-        $this->resetAfterTest(true);
-        $users = $this->create_users(range(1, 4));
+    public function test_process_stops_on_error() {
 
-        $path = $this->write_request_file(
-            "20190101-000000",
-            [
-                'duplicateid,mergetoid,dateofmerge',
-                'user1,user2,1/1/2019 00:00:01', // Should work
-                'missing,user2,1/1/2019 00:00:02', // SMissing from, error
-                'user3,user4,1/1/2019 00:00:03', // Should not be attempted
-            ]
-        );
-
-        $merge_tool_mock = $this->getMergeToolMock();
-        $merge_tool_mock->expects($this->once())
-            ->method('merge')
-            ->with($this->equalTo($users[2]->id), $this->equalTo($users[1]->id))
-            ->will($this->returnValue([true, [], 1]));
-        imisusermerge::set_mock_merge_tool($merge_tool_mock);
-
-        $f = new merge_file($path);
-
-        try {
-            $f->process();
-            throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
-
-        } catch (merge_exception $ex) {
-            $this->assertEquals(1, $f->failed, 'failed count');
-            $this->assertEquals(1, $f->completed, 'completed count');
-            $this->assertEquals(0, $f->skipped, 'skipped count');
-            $this->assertEquals('STATUS_ERROR', $f->status);
-            $this->assertFailedFiles($path);
-            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
-        }
-    }
-
-
-    /**
-     * @throws merge_exception
-     * @throws \coding_exception
-     */
-    public function test_process_ambiguous_merges() {
-        $this->resetAfterTest(true);
-
-        $path = $this->write_request_file("20190101-000000", [
-            'duplicateid,mergetoid,dateofmerge',
-            'user1,user2,1/1/2019 00:00:02', // ok
-            'user3,user4,1/1/2019 00:00:03', // fail
-            'user5,user6,1/1/2019 00:00:01', // not attempted
-        ]);
-
-        $merge_tool_mock = $this->getMergeToolMock();
-        $merge_tool_mock->expects($this->never())
-            ->method('merge');
-        imisusermerge::set_mock_merge_tool($merge_tool_mock);
-        $f = new merge_file($path);
-
-        try {
-            $f->process();
-            $this->fail("Did not receive expected merge_exception");
-
-        } catch (merge_exception $ex) {
-            $this->assertEquals('STATUS_ERROR', $f->getStatus());
-            $this->assertFailedFiles($path);
-            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
-        }
-    }
-
-    /**
-     * @throws merge_exception
-     * @throws \coding_exception
-     */
-    public function test_process_fail_error_from_merge_tool() {
         $this->resetAfterTest(true);
 
         $users = $this->create_users(range(1, 6));
@@ -368,6 +295,41 @@ class merge_file_testcase extends base {
         }
 
     }
+
+
+    /**
+     * @throws merge_exception
+     * @throws \coding_exception
+     */
+    public function test_load_ambiguous_merges() {
+        $this->resetAfterTest(true);
+
+        $path = $this->write_request_file("20190101-000000", [
+            'duplicateid,mergetoid,dateofmerge',
+            'user1,user2,1/1/2019 00:00:02', // ok
+            'user1,user4,1/1/2019 00:00:03', // ambigous
+            'user5,user6,1/1/2019 00:00:01', // not attempted
+        ]);
+
+        $merge_tool_mock = $this->getMergeToolMock();
+        $merge_tool_mock->expects($this->never())
+            ->method('merge');
+        imisusermerge::set_mock_merge_tool($merge_tool_mock);
+
+        $f = new merge_file($path);
+
+        try {
+            $f->process();
+            $this->fail("Did not receive expected merge_exception");
+
+        } catch (merge_exception $ex) {
+            $this->assertEquals('STATUS_INVALID_FILE', $f->getStatus());
+            $this->assertFailedFiles($path);
+            $this->assert_log_file_contents($this->get_failed_log_path($path), $f);
+        }
+    }
+
+
 
     /**
      * @return array

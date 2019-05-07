@@ -108,8 +108,8 @@ class merge_action_testcase extends base {
      */
     public function merge_missing_users_dataset() {
         return [
-            'missing from' => ['missing,exists,1/1/2019', merge_action::STATUS_ERROR],
-            'missing both' => ['missing1,missing2,1/1/2019', merge_action::STATUS_ERROR],
+            'missing from' => ['missing,exists,1/1/2019', merge_action::STATUS_SKIPPED],
+            'missing both' => ['missing1,missing2,1/1/2019', merge_action::STATUS_SKIPPED],
         ];
     }
 
@@ -119,6 +119,7 @@ class merge_action_testcase extends base {
      * @param $expected_status
      * @throws merge_exception
      * @throws \dml_exception
+     * @throws \coding_exception
      */
     public function test_merge_missing_from_user($line, $expected_status) {
         $this->resetAfterTest(true);
@@ -129,17 +130,16 @@ class merge_action_testcase extends base {
         $merge_tool_mock = $this->getMergeToolMock();
         $merge_tool_mock->expects($this->never())->method('merge');
         imisusermerge::set_mock_merge_tool($merge_tool_mock);
-
-        try {
-            $m->merge();
-            throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
-
-        } catch (merge_exception $ex) {
-            $this->assertEquals($expected_status, $m->getStatus());
-        }
-
+        $m->merge();
+        $this->assertEquals($expected_status, $m->getStatus());
     }
 
+
+    /**
+     * @throws \dml_exception
+     * @throws merge_exception
+     * @throws \coding_exception
+     */
     public function test_merge_missing_to_user() {
         global $DB;
         $this->resetAfterTest(true);
@@ -206,48 +206,38 @@ class merge_action_testcase extends base {
         $this->assertEquals($expected_merge_time, $m->getMergeTime(), 'merge_time');
     }
 
-
     /**
-     * @return array
-     */
-    public function merge_skips_dataset() {
-        return [
-            'same users' => ['user1,user1,1/1/2019', merge_action::STATUS_SKIPPED],
-        ];
-    }
-
-    /**
-     * @dataProvider merge_skips_dataset
-     * @param $line
-     * @param $expected_status
-     * @throws merge_exception
+     * @throws \coding_exception
      * @throws \dml_exception
+     * @throws merge_exception
      */
-    public function test_merge_skips($line, $expected_status) {
+    public function test_merge_skips() {
         $this->resetAfterTest(true);
 
-        $merge_tool_mock = $this->getMergeToolMock();
-        $merge_tool_mock->expects($this->never())->method('merge');
-        imisusermerge::set_mock_merge_tool($merge_tool_mock);
-
-        $m = new merge_action(1, $line, $this->map);
+        $this->getDataGenerator()->create_user(['username' => 'exists']);
 
         $mock = $this->getMergeToolMock();
         $mock->expects($this->never())->method('merge');
-        imisusermerge::set_mock_merge_tool($merge_tool_mock);
+        imisusermerge::set_mock_merge_tool($mock);
 
-        try {
+        $lines = [
+            'user1,user1,1/1/2019',
+            'missing,exists,1/1/2019',
+            'missing1,missing2,1/1/2019'
+        ];
+
+        foreach ($lines as $line) {
+            $m = new merge_action(1, $line, $this->map);
             $m->merge();
-            throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
-
-        } catch (merge_exception $ex) {
-            $this->assertEquals($expected_status, $m->getStatus());
+            $this->assertEquals(merge_action::STATUS_SKIPPED, $m->status);
         }
+
     }
 
     /**
      * @throws merge_exception
      * @throws \dml_exception
+     * @throws \coding_exception
      */
     public function test_user_merged_only_once() {
         $this->resetAfterTest(true);
@@ -267,18 +257,14 @@ class merge_action_testcase extends base {
         $merge_tool_mock->expects($this->never())->method('merge');
         imisusermerge::set_mock_merge_tool($merge_tool_mock);
 
-        try {
-            $m->merge();
-            throw new \PHPUnit_Framework_AssertionFailedError("Did not receive expected merge_exception");
-
-        } catch (merge_exception $ex) {
-            $this->assertEquals(merge_action::STATUS_SKIPPED, $m->getStatus());
-        }
+        $m->merge();
+        $this->assertEquals(merge_action::STATUS_SKIPPED, $m->getStatus());
     }
 
     /**
      * @throws merge_exception
      * @throws \dml_exception
+     * @throws \coding_exception
      */
     public function test_merge_fails() {
         $this->resetAfterTest(true);

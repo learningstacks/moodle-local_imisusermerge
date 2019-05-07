@@ -266,7 +266,7 @@ class merge_file implements \JsonSerializable {
             // Check for ambiguous merges
             if (!empty($this->ambiguous_merges)) {
                 $this->status = self::STATUS_INVALID_FILE;
-                $this->message = get_string('ambiguous_merges', imisusermerge::COMPONENT_NAME, implode(", ", $this->as_string_params()));
+                $this->message = get_string('ambiguous_merges', imisusermerge::COMPONENT_NAME);
                 throw new merge_exception('invalid_file', $this->message);
             }
 
@@ -310,7 +310,6 @@ class merge_file implements \JsonSerializable {
      *
      * @return void
      * @throws merge_exception
-     * @throws \coding_exception
      */
     public function process() {
         $this->failed = 0;
@@ -323,11 +322,20 @@ class merge_file implements \JsonSerializable {
                 $this->load();
             }
 
+            $failed_log_path = $this->get_failed_log_path();
+            if (is_file($failed_log_path)) {
+                unlink($failed_log_path);
+            }
+
             /* @var $merge merge_action */
             foreach ($this->merges as $merge) {
                 try {
                     $merge->merge(); // Succeeds or throws
-                    $this->completed++;
+                    if ($merge->status == merge_action::STATUS_SKIPPED) {
+                        $this->skipped++;
+                    } else {
+                        $this->completed++;
+                    }
 
                 } catch (merge_exception $ex) {
                     switch ($merge->getStatus()) {
