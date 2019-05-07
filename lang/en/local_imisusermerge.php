@@ -65,3 +65,5 @@ $string['user_update_failed'] = 'error attempting to update the imisid of a user
 $string["read_failed"] = 'Failed reading file {$a->file_path}. {$a->message}';
 $string['sort_failed'] = 'Sorting file contents by merge datetime failed: {$a->message}';
 $string['ambiguous_merges'] = 'The file requests the following IMIS ids to be merged to more than one destination {$a}';
+$string['same_user'] = 'DuplicateID and MergeToID are the same';
+$string['already_merged'] = 'User with DuplicateID has already been merged';
