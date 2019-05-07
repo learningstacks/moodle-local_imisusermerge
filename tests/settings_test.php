@@ -5,9 +5,6 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . "/base.php");
 
-use local_imisusermerge\imisusermerge;
-use local_imisusermerge\merge_exception;
-
 class settings_testcase extends base {
 
     public function setUp() {
