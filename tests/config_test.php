@@ -104,15 +104,12 @@ class config_testcase extends base {
      * @dataProvider invalid_config_dataset
      * @param $data
      * @throws \coding_exception
+     * @throws merge_exception
      */
     public function test_invalid_config($data) {
         $this->resetAfterTest(true);
         $this->set_test_config($data);
-        try {
-            new config();
-            $this->fail("FAIL: Did not receive expected merge_exception");
-        } catch (merge_exception $ex) {
-            $a = $ex->errorcode;
-        }
+        $this->expectException(merge_exception::class);
+        new config();
     }
 }
