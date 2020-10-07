@@ -56,7 +56,7 @@ class cron_task_testcase extends base {
         (new cron_task())->execute();
         $this->assertEquals(1, count($this->get_merge_tasks()));
 
-        // Execute again and verify no additioonal task is created
+        // Execute again and verify no additional task is created
         (new cron_task())->execute();
         $this->assertEquals(1, count($this->get_merge_tasks()));
     }

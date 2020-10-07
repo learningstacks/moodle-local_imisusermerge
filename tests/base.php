@@ -9,6 +9,7 @@ use local_imisusermerge\merge_file;
 use local_imisusermerge\task\merge_task;
 use local_imisusermerge\config;
 use \MergeUserTool;
+use Symfony\Component\Filesystem\Filesystem;
 
 /**
  * Class base
@@ -20,6 +21,7 @@ abstract class base extends \advanced_testcase {
      * @var config
      */
     protected $config;
+    protected $fsroot;
 
     /**
      *
@@ -30,19 +32,19 @@ abstract class base extends \advanced_testcase {
 
         global $CFG;
 
-        if (!is_dir($CFG->phpunit_merge_in_dir)) {
-            throw new \coding_exception("phpunit_merge_in_dir not set");
+        $this->fsroot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "local_imisusermerge";
+        if (is_dir($this->fsroot)) {
+            $fs = new Filesystem();
+            $fs->remove($this->fsroot);
         }
 
-        if (!is_dir($CFG->phpunit_merge_completed_dir)) {
-            throw new \coding_exception("phpunit_merge_completed_dir not set");
-        }
+        $CFG->merge_in_dir = $this->fsroot . DIRECTORY_SEPARATOR . "in";
+        $CFG->merge_completed_dir = $this->fsroot . DIRECTORY_SEPARATOR . "complete";
+        mkdir($this->fsroot);
+        mkdir($CFG->merge_in_dir);
+        mkdir($CFG->merge_completed_dir);
 
-        $CFG->merge_in_dir = $CFG->phpunit_merge_in_dir;
-        $CFG->merge_completed_dir = $CFG->phpunit_merge_completed_dir;
         $this->config = new config();
-
-        $this->delete_all_files();
         imisusermerge::set_mock_merge_tool(null);
         imisusermerge::set_config(null);
     }
@@ -50,7 +52,8 @@ abstract class base extends \advanced_testcase {
     /**
      */
     public function tearDown() {
-        $this->delete_all_files();
+        $fs = new Filesystem();
+        $fs->remove($this->fsroot);
     }
 
     /**
@@ -83,26 +86,6 @@ abstract class base extends \advanced_testcase {
             unset_config(
                 'notification_email_addresses',
                 imisusermerge::COMPONENT_NAME);
-        }
-    }
-
-    /**
-     */
-    public function delete_all_files() {
-        if (is_dir($this->config->in_dir)) {
-            $files = glob("{$this->config->in_dir}/{$this->config->file_base}*"); // get all file names
-            foreach ($files as $file) { // iterate files
-                if (is_file($file))
-                    unlink($file); // delete file
-            }
-        }
-
-        if (is_dir($this->config->completed_dir)) {
-            $files = glob("{$this->config->completed_dir}/{$this->config->file_base}*"); // get all file names
-            foreach ($files as $file) { // iterate files
-                if (is_file($file))
-                    unlink($file); // delete file
-            }
         }
     }
 

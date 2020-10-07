@@ -13,25 +13,24 @@ use local_imisusermerge\merge_exception;
  * Class config_testcase
  * @package local_imisusermerge\tests
  */
-class config_testcase extends base {
+class config_testcase extends base
+{
 
-    /**
-     * @var string
-     */
-    private $base_dir = 'C:/dev/IAFF/merge_requests';
 
     /**
      * @throws \coding_exception
      * @throws merge_exception
      */
-    public function setUp() {
+    public function setUp()
+    {
         parent::setup();
     }
 
     /**
      *
      */
-    public function tearDown() {
+    public function tearDown()
+    {
         parent::tearDown();
     }
 
@@ -40,20 +39,21 @@ class config_testcase extends base {
      * @throws merge_exception
      * @throws \coding_exception
      */
-    public function test_valid_config() {
+    public function test_valid_config()
+    {
         global $CFG;
 
         $this->resetAfterTest(true);
 
         $this->set_test_config([
-            'merge_in_dir' => $CFG->phpunit_merge_in_dir,
-            'merge_completed_dir' => $CFG->phpunit_merge_completed_dir,
+            'merge_in_dir' => $CFG->merge_in_dir,
+            'merge_completed_dir' => $CFG->merge_completed_dir,
             'notification_email_addresses' => 'someone@somewhere.com;someone2@somewhere.com'
         ]);
 
         $config = new config();
-        $this->assertEquals("{$this->base_dir}/todo", $config->in_dir);
-        $this->assertEquals("{$this->base_dir}/completed", $config->completed_dir);
+        $this->assertEquals($CFG->merge_in_dir, $config->in_dir);
+        $this->assertEquals($CFG->merge_completed_dir, $config->completed_dir);
         $this->assertEquals('duplicateid', $config->file_field_map['from_imisid']);
         $this->assertEquals('mergetoid', $config->file_field_map['to_imisid']);
         $this->assertEquals('dateofmerge', $config->file_field_map['merge_time']);
@@ -66,7 +66,8 @@ class config_testcase extends base {
      * @return array
      * @throws \coding_exception
      */
-    public function invalid_config_dataset() {
+    public function invalid_config_dataset()
+    {
         global $CFG;
         return [
             'no settings' => [
@@ -88,8 +89,8 @@ class config_testcase extends base {
             ],
             'invalid emails' => [
                 [
-                    'merge_in_dir' => $CFG->phpunit_merge_in_dir,
-                    'merge_completed_dir' => $CFG->phpunit_merge_completed_dir,
+                    'merge_in_dir' => $CFG->merge_in_dir,
+                    'merge_completed_dir' => $CFG->merge_completed_dir,
                     'notification_email_addresses' => "goodemail@dest.com;bademail1;bademail2@z"
                 ],
                 [
@@ -106,7 +107,8 @@ class config_testcase extends base {
      * @throws \coding_exception
      * @throws merge_exception
      */
-    public function test_invalid_config($data) {
+    public function test_invalid_config($data)
+    {
         $this->resetAfterTest(true);
         $this->set_test_config($data);
         $this->expectException(merge_exception::class);
