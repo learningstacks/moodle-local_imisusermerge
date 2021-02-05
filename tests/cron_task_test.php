@@ -13,20 +13,25 @@ use local_imisusermerge\task\merge_task;
  * Class cron_task_testcase
  * @package local_imisusermerge\tests
  */
-class cron_task_testcase extends base {
+class cron_task_testcase extends base
+{
 
     /**
      * @throws \coding_exception
      * @throws \local_imisusermerge\merge_exception
      */
-    public function setUp() {
+    public function setUp()
+    {
+        global $CFG;
         parent::setup();
+        $CFG->mtrace_wrapper = __NAMESPACE__ . '\mtrace_wrapper_stub';
     }
 
     /**
      *
      */
-    public function tearDown() {
+    public function tearDown()
+    {
         parent::tearDown();
     }
 
@@ -34,7 +39,8 @@ class cron_task_testcase extends base {
      * @return array
      * @throws \dml_exception
      */
-    protected function get_merge_tasks() {
+    protected function get_merge_tasks()
+    {
         global $DB;
         $comp = imisusermerge::COMPONENT_NAME;
         $class = '\\' . merge_task::class;
@@ -49,7 +55,8 @@ class cron_task_testcase extends base {
      * @throws \dml_exception
      * @throws \local_imisusermerge\merge_exception
      */
-    public function test_cron_no_task() {
+    public function test_cron_no_task()
+    {
         $this->resetAfterTest(true);
 
         $this->assertEmpty($this->get_merge_tasks());

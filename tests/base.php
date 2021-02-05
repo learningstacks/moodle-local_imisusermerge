@@ -11,6 +11,11 @@ use local_imisusermerge\config;
 use \MergeUserTool;
 use Symfony\Component\Filesystem\Filesystem;
 
+
+function mtrace_wrapper_stub($string, $eol)
+{
+    // Suppress output during unit test
+}
 /**
  * Class base
  * @package local_imisusermerge\tests

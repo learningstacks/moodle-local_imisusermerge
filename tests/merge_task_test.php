@@ -20,8 +20,10 @@ class merge_task_testcase extends base {
      * @throws \local_imisusermerge\merge_exception
      */
     public function setUp() {
+        global $CFG;
         parent::setup();
-    }
+        $CFG->mtrace_wrapper = __NAMESPACE__ . '\mtrace_wrapper_stub';
+     }
 
     /**
      *
